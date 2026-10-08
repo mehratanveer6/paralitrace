@@ -79,7 +79,10 @@ def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
     sigma = np.sqrt(2 * p.eddy_diffusivity_m2s * dt)
     decay = np.exp(-dt / (p.lifetime_hours * 3600))
 
-    t = max(min(rel_t.min(), t0), wind.times[0])
+    t_start = max(min(rel_t.min(), t0), wind.times[0])
+    t = t0 - np.ceil((t0 - t_start) / dt) * dt   # step grid aligned to t0, so hour bins line up
+    if t < wind.times[0]:
+        t += dt
     t_end = min(t0 + H * 3600, wind.times[-1])
     next_snap = t0
     while t < t_end:

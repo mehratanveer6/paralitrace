@@ -5,109 +5,183 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParaliTrace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Atkinson+Hyperlegible:wght@400;700&family=Noto+Sans+Gurmukhi:wght@800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
+  /* Risograph inks on sooty newsprint */
   :root {
-    --sky: #dde4e9;       /* smog-day sky, panel ground */
-    --sky-2: #cfd8de;
-    --ink: #1e2b36;       /* slate */
-    --ink-soft: #52616d;
-    --smoke: #5e4b3f;
-    --ember: #e2550f;     /* fire detections */
-    --field: #2f7a45;     /* intervention targets */
-    --low: #7fa89c; --moderate: #d2a12a; --high: #d4602a; --severe: #8c1d3c;
-    --line: #b9c4cc;
+    --paper: #bebcb4;      /* soot-grey newsprint */
+    --paper-hi: #d4d2ca;
+    --ink: #000;           /* riso black */
+    --fire: #ff5f1f;       /* fluorescent orange */
+    --severe: #ff3ea5;     /* fluorescent pink */
+    --moderate: #ffe800;   /* fluorescent yellow */
+    --field: #00a95c;      /* riso green: fields you can still save */
+    --display: "Bricolage Grotesque", "Atkinson Hyperlegible", sans-serif;
+    --body: "Atkinson Hyperlegible", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
-    font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
-    font-size: 15px; line-height: 1.45; color: var(--ink); background: var(--sky);
-    display: grid; grid-template-columns: 380px 1fr; height: 100vh;
+    font-family: var(--body); font-size: 15px; line-height: 1.45; color: var(--ink);
+    background: var(--paper);
+    display: grid; grid-template-columns: 400px 1fr; grid-template-rows: auto 1fr; height: 100vh;
   }
-  aside { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
-  header { padding: 20px 22px 14px; }
-  h1 { font-size: 26px; line-height: 1.1; margin: 0; letter-spacing: -0.01em; }
-  header p { margin: 6px 0 0; color: var(--ink-soft); }
-  .demo { margin: 10px 22px 0; padding: 8px 12px; border-left: 3px solid var(--moderate);
-          background: #f1e7c9; font-size: 13px; }
-  nav { display: flex; gap: 4px; padding: 14px 22px 0; border-bottom: 1px solid var(--line); }
-  nav button { font: inherit; background: none; border: 0; padding: 8px 12px 10px; cursor: pointer;
-               color: var(--ink-soft); border-bottom: 3px solid transparent; }
-  nav button[aria-selected="true"] { color: var(--ink); font-weight: 700; border-bottom-color: var(--ink); }
-  .pane { overflow-y: auto; padding: 14px 22px 22px; flex: 1; }
+  body::after { /* paper grain over everything */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2000; opacity: .32; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  button, input, textarea { font: inherit; color: inherit; }
+
+  /* Masthead */
+  .mast { grid-column: 1 / -1; display: grid; grid-template-columns: 400px 1fr; border-bottom: 3px solid var(--ink); }
+  .brand { padding: 14px 20px 12px; border-right: 3px solid var(--ink); display: flex; align-items: center; gap: 14px; }
+  .gur { font-family: "Noto Sans Gurmukhi", sans-serif; font-weight: 800; font-size: 40px; line-height: 1;
+         color: var(--fire); text-shadow: 3px 2px 0 var(--ink); transform: rotate(-4deg); }
+  .brand h1 { font-family: var(--display); font-weight: 800; font-variation-settings: "wdth" 75; font-size: 34px;
+              line-height: .9; margin: 0; letter-spacing: -0.02em; }
+  .brand p { margin: 3px 0 0; font-size: 13px; }
+  .ticker { overflow: hidden; display: flex; align-items: center; background: var(--ink); color: var(--paper-hi); }
+  .ticker-track { display: flex; gap: 56px; white-space: nowrap; padding-left: 40px;
+                  font-family: var(--display); font-weight: 700; font-size: 20px; animation: crawl 60s linear infinite; }
+  .ticker-track b { color: var(--fire); font-weight: 800; }
+  .ticker-track .sev { color: var(--severe); }
+  @keyframes crawl { to { transform: translateX(-50%); } }
+
+  /* Left column */
+  aside { display: flex; flex-direction: column; min-height: 0; border-right: 3px solid var(--ink); }
+  .clock { padding: 16px 20px 14px; border-bottom: 3px solid var(--ink); }
+  .clock .when { font-family: var(--display); font-weight: 800; font-variation-settings: "wdth" 75;
+                 font-size: 46px; line-height: .95; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .clock .rel { font-size: 14px; margin-top: 4px; }
+  .demo { display: inline-block; margin-top: 10px; padding: 3px 9px; background: var(--moderate);
+          border: 2px solid var(--ink); font-weight: 700; font-size: 13px; transform: rotate(-1.5deg); }
+
+  nav { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 3px solid var(--ink); }
+  nav button { background: none; border: 0; border-right: 3px solid var(--ink); padding: 10px 0; cursor: pointer;
+               font-family: var(--display); font-weight: 700; font-size: 18px; }
+  nav button:last-child { border-right: 0; }
+  nav button[aria-selected="true"] { background: var(--ink); color: var(--paper-hi); }
+  .pane { overflow-y: auto; padding: 0 20px 24px; flex: 1; }
   .pane[hidden] { display: none; }
-  button, input, textarea { font: inherit; }
-  :focus-visible { outline: 3px solid var(--ember); outline-offset: 2px; }
 
-  .city { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center;
-          width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line);
-          padding: 10px 2px; cursor: pointer; color: inherit; }
-  .city:hover { background: var(--sky-2); }
-  .city small { display: block; color: var(--ink-soft); font-size: 13px; }
-  .chip { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; color: #fff; min-width: 70px; text-align: center; }
-  .chip.low { background: var(--low); } .chip.moderate { background: var(--moderate); color: var(--ink); }
-  .chip.high { background: var(--high); } .chip.severe { background: var(--severe); }
-  .cols { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; font-size: 12px; color: var(--ink-soft); padding: 0 2px 4px; }
-  .cols span:not(:first-child) { min-width: 70px; text-align: center; }
+  /* Risk stickers */
+  .st { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 8px; border: 2px solid var(--ink);
+        background: var(--paper-hi); min-width: 74px; text-align: center; }
+  .st.moderate { background: var(--moderate); } .st.high { background: var(--fire); }
+  .st.severe { background: var(--severe); transform: rotate(-3deg); }
 
-  .back { background: none; border: 0; padding: 0; color: var(--ink-soft); cursor: pointer; margin-bottom: 8px; }
-  h2 { font-size: 19px; margin: 0 0 4px; }
-  h3 { font-size: 15px; margin: 18px 0 6px; }
-  .muted { color: var(--ink-soft); font-size: 13px; }
-  svg.spark { width: 100%; height: 110px; display: block; margin-top: 8px; }
-  ol.sources { padding-left: 20px; margin: 0; }
-  ol.sources li { padding: 4px 0; }
-  .bar { height: 6px; background: var(--smoke); border-radius: 3px; margin-top: 3px; opacity: .7; }
+  .row { display: grid; grid-template-columns: 58px 1fr auto; gap: 12px; align-items: center; width: 100%;
+         background: none; border: 0; border-bottom: 2px solid var(--ink); padding: 12px 0; text-align: left; cursor: pointer; }
+  .row:hover { background: var(--paper-hi); }
+  .row .h { font-family: var(--display); font-weight: 800; font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .row .h small { display: block; font-family: var(--body); font-weight: 400; font-size: 11px; }
+  .row .n { font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.05; }
+  .row .n small { display: block; font-family: var(--body); font-weight: 400; font-size: 13px; }
+  .row .stk { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  .key { display: grid; grid-template-columns: 58px 1fr auto; gap: 12px; font-size: 12px; padding: 12px 0 4px; border-bottom: 2px solid var(--ink); }
 
-  label { display: block; font-weight: 700; margin-bottom: 4px; }
-  input[type=number] { width: 120px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
-  .primary { background: var(--ink); color: #fff; border: 0; border-radius: 4px; padding: 9px 14px; cursor: pointer; }
-  .primary:disabled { opacity: .5; cursor: wait; }
-  .result { margin-top: 14px; }
-  .big { font-size: 26px; font-weight: 700; line-height: 1.1; }
-  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
-  .compare div { border-top: 3px solid var(--field); padding-top: 6px; }
-  .compare div + div { border-top-color: var(--line); }
-  ul.targets { list-style: none; padding: 0; margin: 0; }
-  ul.targets li { border-bottom: 1px solid var(--line); padding: 7px 0; font-size: 14px; }
+  .back { background: none; border: 0; padding: 14px 0 6px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  h2 { font-family: var(--display); font-weight: 800; font-variation-settings: "wdth" 75; font-size: 54px;
+       line-height: .9; margin: 4px 0 8px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+  h3 { font-family: var(--display); font-weight: 700; font-size: 20px; margin: 20px 0 8px; }
+  .note { font-size: 13px; }
+  svg.spark { width: 100%; height: 120px; display: block; margin-top: 10px; border: 2px solid var(--ink); background: var(--paper-hi); }
+  .axis { display: flex; justify-content: space-between; font-size: 12px; margin-top: 3px; }
+  ol.src { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  ol.src li { display: grid; grid-template-columns: 64px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ink); }
+  ol.src .pct { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1; }
+  .bar { height: 8px; margin-top: 5px; background:
+         repeating-linear-gradient(-45deg, var(--ink) 0 2px, transparent 2px 5px); border: 1px solid var(--ink); }
 
-  textarea { width: 100%; min-height: 84px; padding: 9px; border: 1px solid var(--line); border-radius: 4px; resize: vertical; background: #fff; }
-  .examples { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 12px; }
-  .examples button { text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 7px 10px; cursor: pointer; color: var(--ink); }
-  .answer { white-space: pre-wrap; background: #fff; padding: 12px; border-radius: 4px; margin-top: 12px; }
-  .error { color: var(--severe); }
+  label { display: block; font-weight: 700; margin: 16px 0 6px; }
+  input[type=number] { width: 110px; padding: 8px 10px; border: 2px solid var(--ink); background: var(--paper-hi); }
+  .go { background: var(--fire); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); padding: 9px 16px;
+        cursor: pointer; font-family: var(--display); font-weight: 800; font-size: 17px; }
+  .go:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  .go:disabled { opacity: .55; cursor: wait; }
+  .vs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0 10px; }
+  .vs > div { border: 2px solid var(--ink); padding: 10px 12px; font-size: 13px; line-height: 1.3; }
+  .vs .win { background: var(--field); transform: rotate(-2deg); box-shadow: 4px 4px 0 var(--ink); }
+  .vs .lose { background: var(--paper-hi); }
+  .vs .big { font-family: var(--display); font-weight: 800; font-size: 44px; line-height: .95; display: block; }
+  .vs .lose .big { text-decoration: line-through; text-decoration-thickness: 3px; }
+  ul.tg { list-style: none; padding: 0; margin: 10px 0 0; }
+  ul.tg li { padding: 8px 0; border-bottom: 1px solid var(--ink); font-size: 14px; }
+  ul.tg b { font-family: var(--display); font-size: 16px; }
 
-  main { position: relative; min-width: 0; }
-  #map { position: absolute; inset: 0; background: var(--sky); }
-  .timeline { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 500;
-              background: rgba(221,228,233,.94); border: 1px solid var(--line); border-radius: 6px;
-              padding: 10px 14px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
-  .timeline button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--ink); color: #fff; cursor: pointer; font-size: 14px; }
-  .timeline input { width: 100%; accent-color: var(--ink); }
-  .clock { font-weight: 700; min-width: 170px; text-align: right; font-variant-numeric: tabular-nums; }
-  .legend { position: absolute; top: 14px; right: 14px; z-index: 500; background: rgba(221,228,233,.94);
-            border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+  textarea { width: 100%; min-height: 90px; padding: 10px; border: 2px solid var(--ink); background: var(--paper-hi); resize: vertical; }
+  .ex { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+  .ex button { background: var(--paper-hi); border: 2px solid var(--ink); padding: 6px 10px; cursor: pointer; text-align: left; font-size: 13px; }
+  .ex button:nth-child(2) { transform: rotate(1deg); } .ex button:nth-child(3) { transform: rotate(-1deg); }
+  .ans { white-space: pre-wrap; margin-top: 16px; padding: 14px; border: 2px solid var(--ink); background: var(--paper-hi);
+         box-shadow: 5px 5px 0 var(--ink); }
+  .err { margin-top: 16px; padding: 10px 12px; border: 2px solid var(--ink); background: var(--severe); font-weight: 700; }
+
+  /* Map, printed */
+  main { position: relative; min-width: 0; min-height: 0; }
+  #map { position: absolute; inset: 0 0 88px 0; background: var(--paper); }
+  .leaflet-tile-pane { filter: grayscale(1) contrast(1.25) brightness(1.08); mix-blend-mode: multiply; opacity: .7; }
+  .leaflet-container { font-family: var(--body); }
+  .leaflet-tooltip.cl { background: var(--ink); color: var(--paper-hi); border: 0; border-radius: 0; box-shadow: none;
+                        font-family: var(--display); font-weight: 700; font-size: 13px; padding: 1px 6px; }
+  .leaflet-tooltip.cl::before { display: none; }
+  .leaflet-bar a { border-radius: 0 !important; background: var(--paper-hi); color: var(--ink); border-color: var(--ink); }
+  .leaflet-control-attribution { background: var(--paper-hi) !important; }
+  .legend { position: absolute; top: 14px; right: 14px; z-index: 600; background: var(--paper-hi); border: 2px solid var(--ink);
+            padding: 8px 12px; font-size: 13px; box-shadow: 4px 4px 0 var(--ink); }
   .legend div { display: flex; align-items: center; gap: 8px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); }
 
-  @media (max-width: 820px) {
-    body { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
-    main { grid-row: 1; height: 58vh; }
-    aside { grid-row: 2; border-right: 0; }
-    .clock { min-width: 0; font-size: 13px; }
+  /* Smoke barcode timeline */
+  .strip { position: absolute; left: 0; right: 0; bottom: 0; height: 88px; border-top: 3px solid var(--ink);
+           display: grid; grid-template-columns: 88px 1fr; background: var(--paper); }
+  .strip > button { border: 0; border-right: 3px solid var(--ink); background: var(--ink); color: var(--paper-hi);
+                    font-size: 26px; cursor: pointer; }
+  .cells { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .cell { border: 0; border-right: 1px solid var(--ink); background: var(--paper-hi); cursor: pointer; padding: 6px 4px;
+          display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; font-size: 11px; min-width: 0; }
+  .cell b { font-family: var(--display); font-size: 16px; font-weight: 800; }
+  .cell.moderate { background: var(--moderate); } .cell.high { background: var(--fire); } .cell.severe { background: var(--severe); }
+  .cell[aria-current="true"] { outline: 4px solid var(--ink); outline-offset: -4px;
+          background-image: repeating-linear-gradient(-45deg, rgba(0,0,0,.25) 0 2px, transparent 2px 6px); }
+  .strip-label { position: absolute; left: 100px; top: -26px; background: var(--ink); color: var(--paper-hi); font-size: 12px; padding: 3px 8px; }
+
+  @media (max-width: 860px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto 62vh auto; height: auto; }
+    .mast { grid-template-columns: 1fr; }
+    .brand { border-right: 0; border-bottom: 3px solid var(--ink); }
+    .ticker { height: 40px; }
+    main { grid-row: 2; height: 62vh; }
+    aside { grid-row: 3; border-right: 0; border-top: 3px solid var(--ink); }
+    .strip { grid-template-columns: 56px 1fr; }
+    .cell { font-size: 0; } .cell b { display: none; }
+    .strip-label { display: none; }
+    h2 { font-size: 44px; }
   }
-  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+  @media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
 </style>
 </head>
 <body>
+<header class="mast">
+  <div class="brand">
+    <span class="gur" lang="pa" aria-hidden="true">ਪਰਾਲੀ</span>
+    <div>
+      <h1>ParaliTrace</h1>
+      <p>Follow the stubble smoke. Stop the right fires.</p>
+    </div>
+  </div>
+  <div class="ticker" aria-label="Smoke bulletin"><div class="ticker-track" id="ticker"></div></div>
+</header>
+
 <aside>
-  <header>
-    <h1>ParaliTrace</h1>
-    <p>Where crop-residue smoke goes in the next 48 hours, and which fields to stop first.</p>
-  </header>
-  <div class="demo" id="demo" hidden>Demo data. These fires and winds are synthetic, not observations.</div>
+  <div class="clock">
+    <div class="when" id="when">Loading</div>
+    <div class="rel" id="rel"></div>
+    <div class="demo" id="demo" hidden>Demo data, not real fires</div>
+  </div>
   <nav role="tablist">
     <button role="tab" aria-selected="true" data-tab="cities">Cities</button>
     <button role="tab" aria-selected="false" data-tab="plan">Plan</button>
@@ -117,99 +191,133 @@
   <section class="pane" id="pane-cities"></section>
 
   <section class="pane" id="pane-plan" hidden>
-    <p class="muted">Field teams and crop-residue machines can only reach so many fields tomorrow. This ranks fire clusters by how many people their smoke would reach.</p>
-    <label for="budget">Fire locations teams can cover</label>
-    <div style="display:flex; gap:8px;">
+    <h3>Which fires to stop tomorrow</h3>
+    <p class="note">Teams and crop-residue machines can only reach so many fields. This picks the fires whose smoke would reach the most people.</p>
+    <label for="budget">Fire locations your teams can cover</label>
+    <div style="display:flex; gap:12px; align-items:center;">
       <input id="budget" type="number" min="1" max="5000" value="150">
-      <button class="primary" id="runPlan">Plan tomorrow</button>
+      <button class="go" id="runPlan">Plan tomorrow</button>
     </div>
-    <div class="result" id="planResult"></div>
+    <div id="planResult"></div>
   </section>
 
   <section class="pane" id="pane-ask" hidden>
-    <label for="q">Ask about the forecast</label>
+    <label for="q">Ask about the smoke</label>
     <textarea id="q" placeholder="Should schools in Mohali hold outdoor assembly tomorrow?"></textarea>
-    <div class="examples">
-      <button>Which cities face the worst smoke tomorrow, and why?</button>
+    <div class="ex">
+      <button>Which cities get the worst smoke tomorrow, and why?</button>
       <button>Write a school advisory for Ludhiana in Punjabi.</button>
       <button>Where should Punjab send 200 machines tomorrow?</button>
     </div>
-    <button class="primary" id="askBtn">Ask</button>
+    <button class="go" id="askBtn">Ask</button>
     <div id="answer"></div>
   </section>
 </aside>
 
 <main>
-  <div id="map" aria-label="Smoke plume map"></div>
+  <div id="map" aria-label="Smoke map"></div>
   <div class="legend" aria-hidden="true">
-    <div><span class="dot" style="background:var(--ember)"></span>Fire cluster</div>
-    <div><span class="dot" style="background:var(--smoke);opacity:.6"></span>Smoke</div>
-    <div><span class="dot" style="border:2px solid var(--field)"></span>Planned target</div>
+    <div><span class="sw" style="background:var(--fire)"></span>Fire</div>
+    <div><span class="sw" style="background:var(--ink);border-color:var(--ink)"></span>Smoke</div>
+    <div><span class="sw" style="background:transparent;border-color:var(--field);border-width:3px"></span>Stop this fire</div>
   </div>
-  <div class="timeline">
+  <div class="strip">
+    <span class="strip-label">Worst smoke anywhere, every 3 hours</span>
     <button id="play" aria-label="Play">&#9654;</button>
-    <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Forecast hour">
-    <div class="clock" id="clock">Loading</div>
+    <div class="cells" id="cells" role="group" aria-label="Forecast hours"></div>
   </div>
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const RISK = [[0, 'low'], [20, 'moderate'], [60, 'high'], [150, 'severe']];
-const COLOR = { low: '#7fa89c', moderate: '#d2a12a', high: '#d4602a', severe: '#8c1d3c' };
+const INK = { low: '#d4d2ca', moderate: '#ffe800', high: '#ff5f1f', severe: '#ff3ea5' };
 const band = v => RISK.reduce((b, [t, n]) => v >= t ? n : b, 'low');
-const ist = e => new Date(e * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
-const LEFT_LABEL = new Set(['mohali', 'gurugram', 'rohtak', 'patiala', 'sonipat']);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (e, o) => new Date(e * 1000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, ...o });
+const LEFT = new Set(['mohali', 'gurugram', 'rohtak', 'patiala', 'sonipat']);
 
-const map = L.map('map', { preferCanvas: true, zoomControl: true }).setView([30.2, 76.0], 7);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap, &copy; CARTO', maxZoom: 12 }).addTo(map);
-const canvas = L.canvas({ padding: 0.3 });
-const layers = { wind: L.layerGroup().addTo(map), smoke: L.layerGroup().addTo(map),
-  fires: L.layerGroup().addTo(map), plan: L.layerGroup().addTo(map),
-  links: L.layerGroup().addTo(map), cities: L.layerGroup().addTo(map) };
+const map = L.map('map', { preferCanvas: true }).setView([30.1, 76.0], 7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 12 }).addTo(map);
+const cv = L.canvas({ padding: 0.3 });
+const G = n => L.layerGroup().addTo(map);
+const layers = { wind: G(), smoke: G(), fireShadow: G(), fires: G(), plan: G(), links: G(), cities: G() };
 
-let D, frame = 0, timer = null, massRef = 1, selected = null;
-const cityMarkers = {};
+let D, frame = 0, timer = null, ref = 1, selected = null;
+const markers = {};
 
 async function load() {
   D = await (await fetch('/api/latest')).json();
   document.getElementById('demo').hidden = D.meta.mode === 'live';
-  const all = D.plumes.flatMap(f => f.points.map(p => p[2])).sort((a, b) => a - b);
-  massRef = all[Math.floor(all.length * 0.95)] || 1;
+  const m = D.plumes.flatMap(f => f.points.map(p => p[2])).sort((a, b) => a - b);
+  ref = m[Math.floor(m.length * 0.95)] || 1;
 
-  D.clusters.forEach(c => L.circleMarker([c.lat, c.lon], { renderer: canvas, radius: 2 + Math.sqrt(c.frp_mw) / 3,
-    stroke: false, fillColor: '#e2550f', fillOpacity: .75 })
-    .bindTooltip(`${plural(c.n_fires, 'fire')}, ${c.frp_mw.toFixed(0)} MW`).addTo(layers.fires));
+  D.clusters.forEach(c => {
+    const r = 2.5 + Math.sqrt(c.frp_mw) / 3;
+    // misregistered second ink pass
+    L.circleMarker([c.lat, c.lon], { renderer: cv, radius: r, stroke: false, fillColor: '#000', fillOpacity: .85, interactive: false })
+      .addTo(layers.fireShadow);
+    L.circleMarker([c.lat, c.lon], { renderer: cv, radius: r, stroke: false, fillColor: '#ff5f1f', fillOpacity: 1 })
+      .bindTooltip(`${plural(c.n_fires, 'fire')}, ${c.frp_mw.toFixed(0)} MW`).addTo(layers.fires);
+  });
+  map.on('zoomend', shiftShadow); shiftShadow();
 
   D.cities.forEach(c => {
-    cityMarkers[c.id] = L.circleMarker([c.lat, c.lon], { radius: 8, weight: 2, color: '#1e2b36', fillOpacity: 1 })
-      .bindTooltip(c.name, { permanent: true, direction: LEFT_LABEL.has(c.id) ? 'left' : 'right',
-        offset: [LEFT_LABEL.has(c.id) ? -8 : 8, 0] })
+    markers[c.id] = L.circleMarker([c.lat, c.lon], { radius: 9, weight: 3, color: '#000', fillOpacity: 1 })
+      .bindTooltip(c.name, { permanent: true, className: 'cl', direction: LEFT.has(c.id) ? 'left' : 'right', offset: [LEFT.has(c.id) ? -10 : 10, 0] })
       .on('click', () => showCity(c.id)).addTo(layers.cities);
   });
 
-  const scrub = document.getElementById('scrub');
-  scrub.max = D.plumes.length - 1;
-  scrub.oninput = () => draw(+scrub.value);
-  draw(0); listCities();
+  buildCells(); buildTicker(); listCities(); draw(0);
 }
 
-function hourAt(f) { return Math.round((D.plumes[f].t - D.meta.forecast_start_epoch) / 3600); }
+function shiftShadow() { // fixed 3px pixel offset whatever the zoom, like a slipped print plate
+  layers.fireShadow.eachLayer(l => {
+    const ll = l._origin || (l._origin = l.getLatLng());
+    const p = map.latLngToLayerPoint(ll).add([3, 3]);
+    l.setLatLng(map.layerPointToLatLng(p));
+  });
+}
+
+const hourAt = f => Math.round((D.plumes[f].t - D.meta.forecast_start_epoch) / 3600);
+const worstAt = h => Math.max(...D.cities.map(c => c.hourly_index[h] || 0));
+
+function buildCells() {
+  const box = document.getElementById('cells');
+  box.innerHTML = D.plumes.map((p, f) => {
+    const h = hourAt(f), b = band(worstAt(h));
+    return `<button class="cell ${b}" data-f="${f}" aria-label="${fmt(p.t, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}, worst smoke ${b}">
+      <b>+${String(h).padStart(2, '0')}h</b><span>${fmt(p.t, { weekday: 'short' })} ${fmt(p.t, { hour: '2-digit', minute: '2-digit' })}</span></button>`;
+  }).join('');
+  box.querySelectorAll('.cell').forEach(b => b.onclick = () => { stop(); draw(+b.dataset.f); });
+}
+
+function buildTicker() {
+  const items = [...D.cities].filter(c => c.peak_risk !== 'low').sort((a, b) => b.peak_index - a.peak_index).slice(0, 8)
+    .map(c => `<span>${esc(c.name)}: smoke peaks <b class="${c.peak_risk === 'severe' ? 'sev' : ''}">${c.peak_risk}</b> around ${esc(c.peak_time_ist)}</span>`);
+  const p = D.plan;
+  items.push(`<span>Stopping ${p.fires_targeted} fires in the right places cuts tomorrow's preventable exposure by <b>${p.exposure_avoided_pct_of_preventable}%</b></span>`);
+  if (D.meta.mode !== 'live') items.unshift('<span><b>Demo data</b> on screen</span>');
+  const html = items.join('');
+  document.getElementById('ticker').innerHTML = html + html;  // doubled for a seamless loop
+}
 
 function draw(f) {
-  frame = f; document.getElementById('scrub').value = f;
+  frame = f;
   const snap = D.plumes[f]; if (!snap) return;
-  document.getElementById('clock').textContent = ist(snap.t);
-  layers.smoke.clearLayers();
-  snap.points.forEach(([la, lo, m]) => L.circleMarker([la, lo], { renderer: canvas, radius: 5, stroke: false,
-    fillColor: '#5e4b3f', fillOpacity: Math.min(.45, .05 + .4 * m / massRef), interactive: false }).addTo(layers.smoke));
-  drawWind(snap.t);
   const h = hourAt(f);
-  D.cities.forEach(c => cityMarkers[c.id].setStyle({ fillColor: COLOR[band(c.hourly_index[h] || 0)] }));
-  if (selected) drawSpark(selected);
+  document.getElementById('when').textContent = fmt(snap.t, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) + ' IST';
+  document.getElementById('rel').textContent = h === 0 ? 'Now' : `${h} hours from now`;
+  document.querySelectorAll('.cell').forEach(c => c.setAttribute('aria-current', +c.dataset.f === f));
+
+  layers.smoke.clearLayers();
+  snap.points.forEach(([la, lo, m]) => L.circleMarker([la, lo], { renderer: cv, interactive: false, stroke: false,
+    radius: 1.2 + 4.5 * Math.min(1, Math.sqrt(m / ref)), fillColor: '#000', fillOpacity: .55 }).addTo(layers.smoke));
+  drawWind(snap.t);
+  D.cities.forEach(c => markers[c.id].setStyle({ fillColor: INK[band(c.hourly_index[h] || 0)] }));
+  if (selected) spark(selected);
 }
 
 function drawWind(t) {
@@ -217,87 +325,95 @@ function drawWind(t) {
   const W = D.wind; let k = 0;
   W.times.forEach((wt, i) => { if (Math.abs(wt - t) < Math.abs(W.times[k] - t)) k = i; });
   W.lats.forEach((la, yi) => W.lons.forEach((lo, xi) => {
-    const u = W.u[k][yi][xi], v = W.v[k][yi][xi], s = 0.06;
-    const tip = [la + v * s, lo + u * s / Math.cos(la * Math.PI / 180)];
-    L.polyline([[la, lo], tip], { renderer: canvas, color: '#52616d', weight: 1.2, opacity: .45, interactive: false }).addTo(layers.wind);
-    L.circleMarker(tip, { renderer: canvas, radius: 1.5, stroke: false, fillColor: '#52616d', fillOpacity: .6, interactive: false }).addTo(layers.wind);
+    const u = W.u[k][yi][xi], v = W.v[k][yi][xi], s = .06;
+    L.polyline([[la, lo], [la + v * s, lo + u * s / Math.cos(la * Math.PI / 180)]],
+      { renderer: cv, color: '#000', weight: 1.5, opacity: .35, dashArray: '2 3', interactive: false }).addTo(layers.wind);
   }));
+}
+
+function hoursToPeak(c) {
+  const i = c.hourly_index.indexOf(Math.max(...c.hourly_index));
+  return i;
 }
 
 function listCities() {
   selected = null; layers.links.clearLayers();
-  const rows = [...D.cities].sort((a, b) => b.day1_mean - a.day1_mean).map(c => `
-    <button class="city" data-id="${c.id}">
-      <span>${esc(c.name)}<small>Peak ${esc(c.peak_time_ist || '')}</small></span>
-      <span class="chip ${c.day1_risk}">${c.day1_risk}</span>
-      <span class="chip ${c.day2_risk}">${c.day2_risk}</span>
+  const rows = [...D.cities].sort((a, b) => b.peak_index - a.peak_index).map(c => `
+    <button class="row" data-id="${c.id}">
+      <span class="h">${hoursToPeak(c) === 0 ? 'Now' : '+' + hoursToPeak(c) + 'h'}<small>${hoursToPeak(c) === 0 ? 'peaking' : 'to peak'}</small></span>
+      <span class="n">${esc(c.name)}<small>${esc(c.peak_time_ist)}</small></span>
+      <span class="stk"><span class="st ${c.day1_risk}">${c.day1_risk}</span><span class="st ${c.day2_risk}">${c.day2_risk}</span></span>
     </button>`).join('');
-  const pane = document.getElementById('pane-cities');
-  pane.innerHTML = `<div class="cols"><span>City</span><span>Next 24 h</span><span>After that</span></div>${rows}
-    <p class="muted" style="margin-top:12px">${D.meta.fire_detections} fire detections in ${D.meta.clusters} clusters. Generated ${esc(D.meta.generated_utc)} UTC. Risk bands are not yet calibrated to PM2.5.</p>`;
-  pane.querySelectorAll('.city').forEach(b => b.onclick = () => showCity(b.dataset.id));
+  const el = document.getElementById('pane-cities');
+  el.innerHTML = `<div class="key"><span>Peak in</span><span>City, worst hour</span><span>Next 24 h / after</span></div>${rows}
+    <p class="note" style="margin-top:14px">${D.meta.fire_detections} fire detections in ${D.meta.clusters} clusters. Source: ${esc(D.meta.data_label)}. Risk levels are not yet calibrated to PM2.5.</p>`;
+  el.querySelectorAll('.row').forEach(b => b.onclick = () => showCity(b.dataset.id));
 }
 
 function showCity(id) {
-  const c = D.cities.find(x => x.id === id); selected = c;
-  tab('cities');
-  const maxShare = Math.max(...c.top_sources.map(s => s.share_pct), 1);
+  const c = D.cities.find(x => x.id === id); selected = c; tab('cities');
+  const max = Math.max(...c.top_sources.map(s => s.share_pct), 1);
   document.getElementById('pane-cities').innerHTML = `
     <button class="back" id="back">All cities</button>
     <h2>${esc(c.name)}</h2>
-    <div class="muted">Peak ${c.peak_risk} smoke around ${esc(c.peak_time_ist)}</div>
-    <svg class="spark" id="spark" viewBox="0 0 336 110" preserveAspectRatio="none" role="img" aria-label="48 hour smoke index"></svg>
-    <div class="muted" style="display:flex;justify-content:space-between"><span>Now</span><span>+24 h</span><span>+48 h</span></div>
-    <h3>Where the smoke comes from</h3>
-    <ol class="sources">${c.top_sources.map(s => `<li>${s.share_pct}% from ${plural(s.fires, 'fire')} around ${esc(s.area)}, ${s.distance_km} km away
-      <div class="bar" style="width:${100 * s.share_pct / maxShare}%"></div></li>`).join('') || '<li>No smoke reaches this city in the window.</li>'}</ol>
-    <p class="muted">${c.preventable_pct}% of this exposure comes from burning projected for tomorrow, which can still be stopped.</p>`;
+    <span class="st ${c.peak_risk}">${c.peak_risk} peak</span> <span class="note">around ${esc(c.peak_time_ist)}</span>
+    <svg class="spark" id="spark" viewBox="0 0 340 120" preserveAspectRatio="none" role="img" aria-label="Smoke over the next 48 hours"></svg>
+    <div class="axis"><span>Now</span><span>+24 h</span><span>+48 h</span></div>
+    <h3>Where ${esc(c.name)}'s smoke comes from</h3>
+    <ol class="src">${c.top_sources.map(s => `<li><span class="pct">${Math.round(s.share_pct)}%</span>
+      <span>${plural(s.fires, 'fire')} around ${esc(s.area)}, ${s.distance_km} km away<div class="bar" style="width:${100 * s.share_pct / max}%"></div></span></li>`).join('')
+      || '<li><span></span><span>No smoke reaches this city in the next 48 hours.</span></li>'}</ol>
+    <p class="note">${c.preventable_pct}% of this smoke comes from fires expected tomorrow. That part can still be stopped.</p>`;
   document.getElementById('back').onclick = listCities;
   layers.links.clearLayers();
-  c.top_sources.forEach(s => L.polyline([[s.lat, s.lon], [c.lat, c.lon]], { color: '#1e2b36', weight: 2, dashArray: '4 6', opacity: .8 }).addTo(layers.links));
+  c.top_sources.forEach(s => L.polyline([[s.lat, s.lon], [c.lat, c.lon]], { color: '#000', weight: 3, dashArray: '1 7', lineCap: 'round' }).addTo(layers.links));
   map.flyTo([c.lat, c.lon], 8, { duration: .6 });
-  drawSpark(c);
+  spark(c);
 }
 
-function drawSpark(c) {
+function spark(c) {
   const svg = document.getElementById('spark'); if (!svg) return;
-  const h = c.hourly_index, W = 336, H = 110, top = Math.max(...h, 160);
+  const h = c.hourly_index, W = 340, H = 120, top = Math.max(...h, 160);
   const y = v => H - 4 - (H - 8) * v / top, x = i => i * W / (h.length - 1);
-  const bands = RISK.slice(1).map(([t, n]) => `<line x1="0" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="${COLOR[n]}" stroke-dasharray="3 4"/>`).join('');
+  let bands = '';
+  RISK.forEach(([t, n], i) => { const t2 = (RISK[i + 1] || [top * 2])[0];
+    bands += `<rect x="0" width="${W}" y="${y(Math.min(t2, top))}" height="${Math.max(0, y(t) - y(Math.min(t2, top)))}" fill="${INK[n]}" opacity=".55"/>`; });
   const area = `M0,${H - 4} ` + h.map((v, i) => `L${x(i)},${y(v)}`).join(' ') + ` L${W},${H - 4} Z`;
   const cur = x(Math.min(hourAt(frame), h.length - 1));
-  svg.innerHTML = `${bands}<path d="${area}" fill="#5e4b3f" fill-opacity=".35" stroke="#5e4b3f"/>
-    <line x1="${cur}" x2="${cur}" y1="0" y2="${H}" stroke="#1e2b36" stroke-width="2"/>`;
+  svg.innerHTML = `${bands}<defs><pattern id="ht" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="2.5" cy="2.5" r="1.6" fill="#000"/></pattern></defs>
+    <path d="${area}" fill="url(#ht)" stroke="#000" stroke-width="2"/>
+    <line x1="${cur}" x2="${cur}" y1="0" y2="${H}" stroke="#000" stroke-width="3"/>`;
 }
 
 async function runPlan() {
   const btn = document.getElementById('runPlan'), out = document.getElementById('planResult');
-  btn.disabled = true; out.textContent = 'Planning';
+  btn.disabled = true; out.innerHTML = '<p class="note">Planning</p>';
   try {
-    const p = await (await fetch('/api/plan?budget=' + document.getElementById('budget').value)).json();
+    const r = await fetch('/api/plan?budget=' + document.getElementById('budget').value);
+    const p = await r.json(); if (!r.ok) throw new Error(p.detail);
     layers.plan.clearLayers();
-    p.clusters.forEach(c => L.circleMarker([c.lat, c.lon], { radius: 9, color: '#2f7a45', weight: 3, fill: false })
+    p.clusters.forEach(c => L.circleMarker([c.lat, c.lon], { radius: 11, color: '#00a95c', weight: 4, fill: false })
       .bindTooltip(`${plural(c.fires, 'fire')}, ${c.location}`).addTo(layers.plan));
     out.innerHTML = `
-      <div class="compare">
-        <div><div class="big">${p.exposure_avoided_pct_of_preventable}%</div>of tomorrow's preventable exposure avoided by this plan</div>
-        <div><div class="big">${p.naive_biggest_fires_pct_of_preventable}%</div>if the same teams went to the biggest fires instead</div>
+      <div class="vs">
+        <div class="win"><span class="big">${p.exposure_avoided_pct_of_preventable}%</span>of tomorrow's preventable smoke exposure avoided with this plan</div>
+        <div class="lose"><span class="big">${p.naive_biggest_fires_pct_of_preventable}%</span>if the same teams went to the biggest fires instead</div>
       </div>
-      <p class="muted">${p.clusters.length} clusters, ${p.fires_targeted} fire locations. ${esc(p.note)}</p>
-      <ul class="targets">${p.clusters.slice(0, 15).map(c => `<li><strong>${plural(c.fires, 'fire')}, ${esc(c.location)}</strong><br>Protects ${esc(c.protects.join(', ') || 'no covered city')}</li>`).join('')}</ul>`;
-  } catch (e) { out.innerHTML = `<p class="error">Planning failed: ${esc(e.message)}</p>`; }
+      <p class="note">${plural(p.clusters.length, 'cluster')}, ${plural(p.fires_targeted, 'fire location')}. ${esc(p.note)}</p>
+      <ul class="tg">${p.clusters.slice(0, 15).map(c => `<li><b>${plural(c.fires, 'fire')}, ${esc(c.location)}</b><br>Protects ${esc(c.protects.join(', ') || 'no covered city')}</li>`).join('')}</ul>`;
+  } catch (e) { out.innerHTML = `<div class="err">Planning failed: ${esc(e.message)}</div>`; }
   btn.disabled = false;
 }
 
 async function ask() {
   const q = document.getElementById('q').value.trim(), out = document.getElementById('answer'), btn = document.getElementById('askBtn');
   if (!q) return;
-  btn.disabled = true; out.innerHTML = '<p class="muted">Reading the forecast</p>';
+  btn.disabled = true; out.innerHTML = '<p class="note">Reading the forecast</p>';
   try {
     const r = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) });
     const j = await r.json();
-    out.innerHTML = r.ok ? `<div class="answer">${esc(j.answer)}</div>` : `<p class="error">${esc(j.detail)}</p>`;
-  } catch (e) { out.innerHTML = `<p class="error">Could not reach the server: ${esc(e.message)}</p>`; }
+    out.innerHTML = r.ok ? `<div class="ans">${esc(j.answer)}</div>` : `<div class="err">${esc(j.detail)}</div>`;
+  } catch (e) { out.innerHTML = `<div class="err">Could not reach the server: ${esc(e.message)}</div>`; }
   btn.disabled = false;
 }
 
@@ -305,17 +421,17 @@ function tab(name) {
   document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
   ['cities', 'plan', 'ask'].forEach(n => document.getElementById('pane-' + n).hidden = n !== name);
 }
+function stop() { if (timer) { clearInterval(timer); timer = null; } const b = document.getElementById('play'); b.innerHTML = '&#9654;'; b.setAttribute('aria-label', 'Play'); }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => tab(b.dataset.tab));
 document.getElementById('runPlan').onclick = runPlan;
 document.getElementById('askBtn').onclick = ask;
-document.querySelectorAll('.examples button').forEach(b => b.onclick = () => { document.getElementById('q').value = b.textContent; ask(); });
+document.querySelectorAll('.ex button').forEach(b => b.onclick = () => { document.getElementById('q').value = b.textContent; ask(); });
 document.getElementById('play').onclick = () => {
-  const btn = document.getElementById('play');
-  if (timer) { clearInterval(timer); timer = null; btn.innerHTML = '&#9654;'; btn.setAttribute('aria-label', 'Play'); return; }
-  btn.innerHTML = '&#10073;&#10073;'; btn.setAttribute('aria-label', 'Pause');
+  if (timer) return stop();
+  const b = document.getElementById('play'); b.innerHTML = '&#10073;&#10073;'; b.setAttribute('aria-label', 'Pause');
   timer = setInterval(() => draw((frame + 1) % D.plumes.length), 700);
 };
-load().catch(e => document.getElementById('clock').textContent = 'Could not load forecast');
+load().catch(() => { document.getElementById('when').textContent = 'No forecast yet'; document.getElementById('rel').textContent = 'Run the pipeline, then reload.'; });
 </script>
 </body>
 </html>
