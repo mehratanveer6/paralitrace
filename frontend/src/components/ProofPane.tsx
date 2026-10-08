@@ -79,6 +79,10 @@ export function ProofPane() {
         <div className="win"><span className="big">{s.spikes_caught}/{s.spike_days}</span>smoke spike days caught a day ahead ({s.hit_rate_pct}%)</div>
         <div className="lose"><span className="big">{s.baseline_hit_rate_pct}%</span>caught by {s.baseline_label}</div>
       </div>
+      {s.onset_days != null && s.onsets_caught != null && s.onset_days > 0 && (
+        <p className="note"><strong>{s.onsets_caught} of {s.onset_days}</strong> episode starts caught, the first smoky day
+          after a clear one. Repeating yesterday can never catch these.</p>
+      )}
       <p className="note">
         {s.false_alarm_pct}% of predicted spikes did not happen.
         {s.median_correlation != null && <> Median rank correlation with measured PM2.5: {s.median_correlation.toFixed(2)}.</>}
@@ -104,6 +108,8 @@ export function ProofPane() {
             {city.correlation != null && <>, rank correlation {city.correlation.toFixed(2)}</>}. Each line is scaled to its own maximum.</p>
         </>
       )}
+
+      {bt.notes && <p className="note">{bt.notes}</p>}
 
       <h3>Every city</h3>
       <table className="bt">

@@ -1,7 +1,7 @@
 """End-to-end run: fetch -> cluster -> trace -> analyse -> output/latest.json.
 
     python -m paralitrace.pipeline --mode synthetic
-    python -m paralitrace.pipeline --mode live          # needs FIRMS_MAP_KEY
+    python -m paralitrace.pipeline --mode live          # real fires; FIRMS_MAP_KEY optional
 """
 from __future__ import annotations
 
@@ -9,17 +9,19 @@ import argparse
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+import numpy as np
 
 from .config import OUTPUT_DIR, PARAMS, env
 from .data import fires as fires_mod
 from .data import winds as winds_mod
+from .data.fires import FireCluster
 from .data.synthetic import synthetic_fires, synthetic_winds
 from .model.analysis import city_forecasts, plan_interventions
-from .data.fires import FireCluster
 from .model.tracer import TraceResult, simulate
 
-import numpy as np
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
 def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_DIR) -> dict:
@@ -27,22 +29,22 @@ def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_
     t0 = float(int(datetime.now(timezone.utc).timestamp() // 3600 * 3600))
 
     if mode == "live":
-        key = env("FIRMS_MAP_KEY")
-        if not key:
-            raise SystemExit("Live data needs a free NASA FIRMS key (firms.modaps.eosdis.nasa.gov/api/map_key). "
-                             "Set FIRMS_MAP_KEY in the terminal that runs the server, then restart it.")
-        df = fires_mod.fetch_firms(key, days=1)
-        wind = winds_mod.fetch_open_meteo(past_days=1, forecast_days=3)
+        df = live_fires()
+        wind = winds_mod.fetch_open_meteo(past_days=2, forecast_days=3)
+        newest = datetime.fromtimestamp(df["t_epoch"].max(), IST).strftime("%d %b, %H:%M IST") if len(df) else "none"
+        label = f"NASA FIRMS VIIRS fires (newest {newest}) + Open-Meteo winds"
     else:
         df = synthetic_fires(t0)
         wind = synthetic_winds(t0 - 36 * 3600, hours=36 + PARAMS.horizon_hours + 6)
+        label = "SYNTHETIC demo data"
 
     clusters = fires_mod.cluster_fires(df)
     trace = simulate(clusters, wind, t0)
     result = {
         "meta": {
             "mode": mode,
-            "data_label": "SYNTHETIC demo data" if mode != "live" else "NASA FIRMS VIIRS + Open-Meteo",
+            "data_label": label,
+            "newest_fire_epoch": int(df["t_epoch"].max()) if len(df) else None,
             "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "forecast_start_epoch": int(t0),
             "horizon_hours": PARAMS.horizon_hours,
@@ -64,6 +66,17 @@ def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_
         json.dump(result, f)
     save_trace(trace, out_dir)
     return result
+
+
+def live_fires():
+    """Keyed FIRMS API when FIRMS_MAP_KEY is set (falls back on failure), else NASA's public no-key files."""
+    key = env("FIRMS_MAP_KEY")
+    if key:
+        try:
+            return fires_mod.keep_fresh(fires_mod.fetch_firms(key, days=2))
+        except Exception as e:
+            print(f"FIRMS API failed ({e}); using the public files instead")
+    return fires_mod.fetch_firms_public("48h")
 
 
 def save_trace(trace, out_dir: str = OUTPUT_DIR) -> None:
@@ -88,6 +101,7 @@ def main():
     a = ap.parse_args()
     r = run(a.mode, a.budget)
     m = r["meta"]
+    print(m["data_label"])
     print(f"[{m['mode']}] {m['fire_detections']} detections -> {m['clusters']} clusters, {m['runtime_s']}s")
     for c in sorted(r["cities"], key=lambda c: -c["day1_mean"])[:6]:
         print(f"  {c['name']:<11} day1={c['day1_mean']:>7.2f} ({c['day1_risk']:<8}) peak {c['peak_time_ist']}")

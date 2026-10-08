@@ -8,10 +8,14 @@ import pandas as pd
 import requests
 
 from ..config import BBOX, WIND_GRID_RES
+from .epoch import to_epoch_seconds
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
-LEVEL_VARS = ("wind_speed_100m", "wind_direction_100m")  # transport within the mixed layer
+# Transport winds inside the mixed layer. The forecast API offers 10/80/120/180 m; the ERA5
+# archive offers 10/100 m. 80 m and 100 m are close enough for smoke transport.
+FORECAST_VARS = ("wind_speed_80m", "wind_direction_80m")
+ARCHIVE_VARS = ("wind_speed_100m", "wind_direction_100m")
 CHUNK = 50  # locations per request
 
 
@@ -66,31 +70,38 @@ def fetch_open_meteo(start_date: str | None = None, end_date: str | None = None,
     """Forecast mode by default; pass start_date/end_date (YYYY-MM-DD) for the ERA5 archive."""
     lats, lons = grid(bbox)
     pts = [(la, lo) for la in lats for lo in lons]
+    archive = start_date is not None
+    names = ARCHIVE_VARS if archive else FORECAST_VARS
     series = []
     for i in range(0, len(pts), CHUNK):
         chunk = pts[i:i + CHUNK]
         params = {
             "latitude": ",".join(f"{p[0]:.3f}" for p in chunk),
             "longitude": ",".join(f"{p[1]:.3f}" for p in chunk),
-            "hourly": ",".join(LEVEL_VARS),
+            "hourly": ",".join(names),
             "wind_speed_unit": "ms",
             "timezone": "UTC",
         }
-        if start_date:
+        if archive:
             params.update(start_date=start_date, end_date=end_date or start_date)
-            url = ARCHIVE_URL
         else:
             params.update(past_days=past_days, forecast_days=forecast_days)
-            url = FORECAST_URL
-        r = requests.get(url, params=params, timeout=60)
-        r.raise_for_status()
+        r = requests.get(ARCHIVE_URL if archive else FORECAST_URL, params=params, timeout=120)
+        if r.status_code >= 400:  # Open-Meteo explains errors in a JSON "reason"
+            raise RuntimeError(f"Open-Meteo error {r.status_code}: {r.text[:300]}")
         data = r.json()
         series.extend(data if isinstance(data, list) else [data])
+    return parse_series(series, lats, lons, names)
 
-    times = pd.to_datetime(series[0]["hourly"]["time"], utc=True).astype("int64").to_numpy() // 10**9
+
+def parse_series(series: list[dict], lats: np.ndarray, lons: np.ndarray, names=FORECAST_VARS) -> WindField:
+    """Open-Meteo multi-location JSON (one dict per grid point, row-major lat then lon) -> WindField."""
+    if len(series) != len(lats) * len(lons):
+        raise RuntimeError(f"Open-Meteo returned {len(series)} locations, expected {len(lats) * len(lons)}")
+    times = to_epoch_seconds(pd.to_datetime(series[0]["hourly"]["time"], utc=True))
     nt, ny, nx = len(times), len(lats), len(lons)
-    spd = np.array([s["hourly"][LEVEL_VARS[0]] for s in series], dtype=float).T.reshape(nt, ny, nx)
-    drc = np.array([s["hourly"][LEVEL_VARS[1]] for s in series], dtype=float).T.reshape(nt, ny, nx)
+    spd = np.array([s["hourly"][names[0]] for s in series], dtype=float).T.reshape(nt, ny, nx)
+    drc = np.array([s["hourly"][names[1]] for s in series], dtype=float).T.reshape(nt, ny, nx)
     spd = np.nan_to_num(spd); drc = np.nan_to_num(drc)
     u, v = speed_dir_to_uv(spd, drc)
     return WindField(lats=lats, lons=lons, times=times.astype(float), u=u, v=v)

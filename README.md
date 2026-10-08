@@ -48,8 +48,10 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 python -m paralitrace.pipeline --mode synthetic     # offline demo data
-export FIRMS_MAP_KEY=...                             # free: firms.modaps.eosdis.nasa.gov/api/map_key
-python -m paralitrace.pipeline --mode live           # real fires + forecast winds
+python -m paralitrace.pipeline --mode live           # real fires + forecast winds (no key needed)
+
+export FIRMS_MAP_KEY=... OPENAQ_API_KEY=...          # both free; needed only for the backtest
+python -m paralitrace.backtest                       # replays Oct-Nov 2025, writes output/backtest.json
 
 cd frontend && npm install && npm run build && cd ..   # build the React UI once
 uvicorn app:app --reload                             # http://127.0.0.1:8000
@@ -91,15 +93,15 @@ The assistant tab needs a model. Pick one with `PT_MODEL`:
 
 - **Strands Agents SDK** (AWS open source) powers the assistant.
 - **Amazon Bedrock** is the default model provider.
-- Planned deployment: Lambda + EventBridge for the hourly pipeline, S3 for outputs,
-  API Gateway for the API, Amplify Hosting for the map.
+- **Amazon EC2** serves the app and refreshes live data hourly. See `deploy/README.md`:
+  one launch script, no SSH needed.
 
 ## Honest limitations
 
 - The tracer is a simplified 2-D model, not a research-grade dispersion model such as HYSPLIT.
   It has no vertical structure, chemistry or rain-out.
-- The smoke index is relative. Risk bands are placeholders until the backtest against 2025 CPCB
-  PM2.5 data calibrates them.
+- The smoke index is relative. The backtest checks it against PM2.5 from ground monitors rather than
+  converting it to a concentration. It uses ERA5 reanalysis winds in place of archived forecasts.
 - City populations are approximate Census 2011 figures.
 - Synthetic mode exists for development. The UI labels it clearly and the agent says so.
 

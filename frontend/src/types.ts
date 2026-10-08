@@ -117,6 +117,7 @@ export interface Backtest {
   end: string;
   lead_hours: number;             // 24
   spike_definition: string;       // plain words, shown in the UI
+  notes?: string;                 // method caveats, shown under the chart
   summary: {
     spike_days: number;           // across all cities
     spikes_caught: number;
@@ -125,6 +126,8 @@ export interface Backtest {
     median_correlation: number | null;
     baseline_label: string;       // e.g. "yesterday's PM2.5 repeated"
     baseline_hit_rate_pct: number;
+    onset_days?: number;          // first day of each spike episode, which "repeat yesterday" can never catch
+    onsets_caught?: number;
   };
   cities: BacktestCity[];
 }
