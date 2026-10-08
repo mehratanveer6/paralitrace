@@ -59,6 +59,16 @@ def plan(budget: int = 150):
     return plan_interventions(load_trace(), budget_fires=max(1, min(budget, 5000)))
 
 
+@app.get("/api/backtest")
+def backtest():
+    """Season replay results written by the backtest (schema: Backtest in frontend/src/types.ts)."""
+    path = os.path.join(OUTPUT_DIR, "backtest.json")
+    if not os.path.exists(path):
+        raise HTTPException(404, "No backtest has been run yet")
+    with open(path) as f:
+        return json.load(f)
+
+
 @app.post("/api/ask")
 def ask(req: AskRequest):
     _latest()
@@ -76,6 +86,11 @@ def index():
         return HTMLResponse("<p>Frontend not built. Run <code>npm install</code> and <code>npm run build</code> "
                             "inside <code>frontend/</code>, then reload.</p>", status_code=503)
     return FileResponse(page)
+
+
+@app.get("/favicon.svg")
+def favicon():
+    return FileResponse(os.path.join(DIST_DIR, "favicon.svg"), media_type="image/svg+xml")
 
 
 if os.path.isdir(os.path.join(DIST_DIR, "assets")):

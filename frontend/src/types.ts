@@ -1,7 +1,7 @@
 // Shapes of the JSON served by the FastAPI backend (paralitrace/pipeline.py).
 
 export type Risk = 'low' | 'moderate' | 'high' | 'severe';
-export type Tab = 'cities' | 'plan' | 'ask';
+export type Tab = 'cities' | 'plan' | 'ask' | 'proof';
 
 export interface Meta {
   mode: 'synthetic' | 'live';
@@ -86,6 +86,47 @@ export interface Wind {
   times: number[];
   u: number[][][];
   v: number[][][];
+}
+
+/* ---- Backtest: output/backtest.json, served at /api/backtest ----
+ * A past season replayed day by day: forecast each day's smoke 24 h ahead from the previous
+ * day's fires and archived winds, then compare with PM2.5 measured at ground monitors.
+ */
+
+export interface BacktestDay {
+  date: string;                   // YYYY-MM-DD (IST)
+  predicted_index: number;        // forecast smoke index, made 24 h ahead
+  observed_pm25: number | null;   // daily mean PM2.5, µg/m³; null when the monitor had no data
+  observed_spike: boolean;        // the city had a smoke spike that day
+  predicted_spike: boolean;       // the forecast called a spike
+}
+
+export interface BacktestCity {
+  id: string;
+  name: string;
+  spike_days: number;
+  spikes_caught: number;
+  false_alarms: number;
+  correlation: number | null;     // Spearman, predicted index vs observed PM2.5
+  days: BacktestDay[];
+}
+
+export interface Backtest {
+  season: string;                 // e.g. "Oct-Nov 2025"
+  start: string;
+  end: string;
+  lead_hours: number;             // 24
+  spike_definition: string;       // plain words, shown in the UI
+  summary: {
+    spike_days: number;           // across all cities
+    spikes_caught: number;
+    hit_rate_pct: number;
+    false_alarm_pct: number;      // share of predicted spikes that did not happen
+    median_correlation: number | null;
+    baseline_label: string;       // e.g. "yesterday's PM2.5 repeated"
+    baseline_hit_rate_pct: number;
+  };
+  cities: BacktestCity[];
 }
 
 export interface Forecast {

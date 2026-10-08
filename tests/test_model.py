@@ -63,3 +63,10 @@ def test_clustering_conserves_frp():
     cl = cluster_fires(df)
     assert len(cl) == 2
     assert sum(c.frp_mw for c in cl) == pytest.approx(18.0)
+
+
+def test_timeline_has_every_frame_even_without_fires():
+    p = ModelParams(horizon_hours=48)
+    for fires in ([], [FireCluster("a", 30.0, 75.5, 40, 4, T0)]):
+        tr = simulate(fires, uniform_wind(2.0, -1.0, hours=96), T0, p)
+        assert [s["t"] for s in tr.snapshots] == [int(T0 + 3 * 3600 * k) for k in range(16)]

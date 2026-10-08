@@ -4,6 +4,9 @@ import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from
 import { INK, LEFT_LABEL, band, hourAt, plural } from '../lib';
 import type { City, Cluster, Forecast, Plan, Snapshot, Wind } from '../types';
 
+/** Punjab, Haryana and Delhi NCR: the map opens fitted to this, whatever the screen size. */
+const REGION: L.LatLngBoundsExpression = [[28.3, 73.9], [32.0, 77.6]];
+
 /** Draw order, bottom to top. Each pane gets its own canvas. */
 const PANES: [string, number][] = [
   ['wind', 410], ['smoke', 420], ['fires', 430], ['plan', 440], ['links', 450], ['cities', 460],
@@ -41,8 +44,11 @@ function WindLayer({ wind, t }: { wind: Wind; t: number }) {
     const s = 0.06;
     wind.lats.forEach((la, yi) => wind.lons.forEach((lo, xi) => {
       const u = wind.u[k][yi][xi], v = wind.v[k][yi][xi];
-      L.polyline([[la, lo], [la + v * s, lo + (u * s) / Math.cos((la * Math.PI) / 180)]],
+      const tip: L.LatLngTuple = [la + v * s, lo + (u * s) / Math.cos((la * Math.PI) / 180)];
+      L.polyline([[la, lo], tip],
         { renderer, pane: 'wind', color: '#000', weight: 1.5, opacity: 0.35, dashArray: '2 3', interactive: false }).addTo(group);
+      // solid dot marks the downwind end, so direction reads at a glance
+      L.circleMarker(tip, { renderer, pane: 'wind', radius: 2, stroke: false, fillColor: '#000', fillOpacity: 0.5, interactive: false }).addTo(group);
     }));
   }, [group, renderer, wind, t]);
   return null;
@@ -108,10 +114,11 @@ export function SmokeMap({ data, frame, city, plan, onSelectCity }: Props) {
   }, [data]);
 
   return (
-    <MapContainer className="map" center={[30.1, 76.0]} zoom={7} preferCanvas>
+    <MapContainer className="map" bounds={REGION} boundsOptions={{ padding: [24, 24] }} zoomSnap={0.25} preferCanvas>
       <Panes />
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-        attribution="&copy; OpenStreetMap &copy; CARTO" maxZoom={12} />
+      {/* Standard OSM tiles need no key; the print filter in styles.css greys them out. */}
+      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution="&copy; OpenStreetMap contributors" maxZoom={12} />
       <WindLayer wind={data.wind} t={snap.t} />
       <SmokeLayer snap={snap} massRef={massRef} />
       <FiresLayer clusters={data.clusters} />

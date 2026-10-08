@@ -56,8 +56,28 @@ uvicorn app:app --reload                             # http://127.0.0.1:8000
 pytest -q
 ```
 
+On Windows, where `python` may not be on PATH, use the launcher: `py -m pip install -r requirements.txt`,
+`py -m pytest -q`, `py -m uvicorn app:app --reload`. In Command Prompt set the key with
+`set FIRMS_MAP_KEY=...` in the same terminal that starts the server.
+
 Working on the UI: keep `uvicorn` running and run `npm run dev` inside `frontend/`, then open
 http://127.0.0.1:5173. Vite hot-reloads and forwards `/api` to the backend.
+
+### The app
+
+- **Map and timeline**: 48 hours of smoke in 3-hour frames. Space plays and pauses, arrow keys step.
+- **Cities**: when each city's smoke peaks, its risk for the next two days, and where its smoke comes from.
+- **Plan**: which fires to stop tomorrow for a given number of field-team locations.
+- **Ask**: the assistant.
+- **Proof**: backtest results against ground monitors.
+- **Fetch live fires** reruns the pipeline on real data from the browser.
+
+### Backtest output
+
+The Proof tab reads `output/backtest.json` through `/api/backtest`. The schema is the `Backtest`
+interface in `frontend/src/types.ts`: a season summary (spike days caught a day ahead, false alarms,
+rank correlation, and a naive baseline to compare against) plus per-city daily rows of forecast
+index against measured PM2.5. Until that file exists the tab explains what it will show.
 
 The assistant tab needs a model. Pick one with `PT_MODEL`:
 

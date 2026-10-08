@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { About } from './About';
 import type { Forecast } from '../types';
 
 function bulletin(data: Forecast): ReactNode[] {
@@ -22,6 +23,7 @@ export function Masthead({ data }: { data: Forecast }) {
         <div>
           <h1>ParaliTrace</h1>
           <p>Follow the stubble smoke. Stop the right fires.</p>
+          <About />
         </div>
       </div>
       <div className="ticker" aria-label="Smoke bulletin">

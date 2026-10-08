@@ -56,6 +56,16 @@ def _releases(clusters, t0, p: ModelParams, rng):
     return np.concatenate(rt), np.concatenate(mass), np.concatenate(src), np.concatenate(proj)
 
 
+def _pad_snapshots(snapshots: list[dict], t0: float, horizon_h: int) -> None:
+    """Add empty frames for any 3-hourly time not yet covered (no fires, or winds ending early)."""
+    have = {s["t"] for s in snapshots}
+    for k in range(0, horizon_h, 3):
+        ts = int(t0 + k * 3600)
+        if ts not in have:
+            snapshots.append({"t": ts, "points": []})
+    snapshots.sort(key=lambda s: s["t"])
+
+
 def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
              p: ModelParams = PARAMS, receptors=RECEPTORS) -> TraceResult:
     rng = np.random.default_rng(p.seed)
@@ -66,6 +76,7 @@ def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
 
     rel_t, mass0, src, proj = _releases(clusters, t0, p, rng)
     if rel_t.size == 0:
+        _pad_snapshots(snapshots, t0, H)
         return TraceResult(t0, hours, dose, by_src, by_src_proj, snapshots, clusters)
 
     lat = np.array([clusters[i].lat for i in src]) + rng.normal(0, 0.02, src.size)
@@ -115,14 +126,18 @@ def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
                         by_src_proj[ri] += np.bincount(src[ai][pm], weights=mass[ai][pm] * area_scale * dt_h,
                                                        minlength=C)
 
-                if t >= next_snap:
-                    sel = a if a.size <= 1500 else rng.choice(a, 1500, replace=False)
-                    snapshots.append({
-                        "t": int(t),
-                        "points": np.column_stack([lat[sel].round(3), lon[sel].round(3),
-                                                   (mass[sel] * 100).round(2)]).tolist(),
-                    })
-                    next_snap += 3 * 3600
+        # Snapshot every 3 h even when no smoke is airborne, so the timeline always has every frame.
+        if t >= t0 and t >= next_snap:
+            a = np.flatnonzero(rel_t <= t)
+            sel = a if a.size <= 1500 else rng.choice(a, 1500, replace=False)
+            snapshots.append({
+                "t": int(next_snap),
+                "points": np.column_stack([lat[sel].round(3), lon[sel].round(3),
+                                           (mass[sel] * 100).round(2)]).tolist(),
+            })
+            next_snap += 3 * 3600
         t += dt
+
+    _pad_snapshots(snapshots, t0, H)
 
     return TraceResult(t0, hours, dose, by_src, by_src_proj, snapshots, clusters)

@@ -29,7 +29,8 @@ def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_
     if mode == "live":
         key = env("FIRMS_MAP_KEY")
         if not key:
-            raise SystemExit("Set FIRMS_MAP_KEY (free at firms.modaps.eosdis.nasa.gov/api/map_key)")
+            raise SystemExit("Live data needs a free NASA FIRMS key (firms.modaps.eosdis.nasa.gov/api/map_key). "
+                             "Set FIRMS_MAP_KEY in the terminal that runs the server, then restart it.")
         df = fires_mod.fetch_firms(key, days=1)
         wind = winds_mod.fetch_open_meteo(past_days=1, forecast_days=3)
     else:

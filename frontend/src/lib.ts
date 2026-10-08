@@ -1,4 +1,4 @@
-import type { City, Forecast, Plan, Risk } from './types';
+import type { Backtest, City, Forecast, Plan, Risk } from './types';
 
 /** Smoke-index thresholds, kept in sync with RISK_BANDS in paralitrace/config.py. */
 export const RISK: [number, Risk][] = [[0, 'low'], [20, 'moderate'], [60, 'high'], [150, 'severe']];
@@ -33,6 +33,14 @@ async function json<T>(r: Response): Promise<T> {
 
 export const api = {
   latest: () => fetch('/api/latest').then(r => json<Forecast>(r)),
+  /** Resolves to null when no backtest has been run yet (404). */
+  backtest: () => fetch('/api/backtest').then(r => (r.status === 404 ? null : json<Backtest>(r))),
+  run: (mode: 'live' | 'synthetic') =>
+    fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    }).then(r => json<unknown>(r)),
   plan: (budget: number) => fetch(`/api/plan?budget=${budget}`).then(r => json<Plan>(r)),
   ask: (question: string) =>
     fetch('/api/ask', {
