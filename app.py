@@ -1,5 +1,6 @@
-"""FastAPI server: serves the map and the model's output.
+"""FastAPI server: serves the built React app and the model's output.
 
+    cd frontend && npm install && npm run build && cd ..
     uvicorn app:app --reload
 """
 from __future__ import annotations
@@ -8,7 +9,7 @@ import json
 import os
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -16,7 +17,7 @@ from paralitrace.config import OUTPUT_DIR
 from paralitrace.model.analysis import plan_interventions
 from paralitrace.pipeline import load_trace, run
 
-WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
+DIST_DIR = os.path.join(os.path.dirname(__file__), "frontend", "dist")  # built React app
 app = FastAPI(title="ParaliTrace")
 
 
@@ -70,7 +71,12 @@ def ask(req: AskRequest):
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(WEB_DIR, "index.html"))
+    page = os.path.join(DIST_DIR, "index.html")
+    if not os.path.exists(page):
+        return HTMLResponse("<p>Frontend not built. Run <code>npm install</code> and <code>npm run build</code> "
+                            "inside <code>frontend/</code>, then reload.</p>", status_code=503)
+    return FileResponse(page)
 
 
-app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+if os.path.isdir(os.path.join(DIST_DIR, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")

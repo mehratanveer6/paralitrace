@@ -51,9 +51,13 @@ python -m paralitrace.pipeline --mode synthetic     # offline demo data
 export FIRMS_MAP_KEY=...                             # free: firms.modaps.eosdis.nasa.gov/api/map_key
 python -m paralitrace.pipeline --mode live           # real fires + forecast winds
 
+cd frontend && npm install && npm run build && cd ..   # build the React UI once
 uvicorn app:app --reload                             # http://127.0.0.1:8000
 pytest -q
 ```
+
+Working on the UI: keep `uvicorn` running and run `npm run dev` inside `frontend/`, then open
+http://127.0.0.1:5173. Vite hot-reloads and forwards `/api` to the backend.
 
 The assistant tab needs a model. Pick one with `PT_MODEL`:
 
@@ -81,4 +85,4 @@ The assistant tab needs a model. Pick one with `PT_MODEL`:
 
 ## Built with
 
-Python, NumPy, FastAPI, Leaflet, Strands Agents SDK. AI coding assistant: Claude (Anthropic).
+Python, NumPy, FastAPI, Strands Agents SDK. Frontend: React 19, TypeScript, Vite, react-leaflet. AI coding assistant: Claude (Anthropic).

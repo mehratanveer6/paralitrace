@@ -4,3 +4,6 @@ __pycache__/
 .env
 output/
 .pytest_cache/
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
