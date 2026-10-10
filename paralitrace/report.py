@@ -100,9 +100,10 @@ in the held-out November test (see the Proof tab).
 
 AWS services: Not used in production for this submission. My AWS account's student credits weren't approved
 before the deadline, so I built entirely on the AWS open-source path the rules allow. The repository includes
-a ready Amazon EC2 deployment (deploy/ec2-user-data.sh: installs the app, runs it as a service and refreshes
-live NASA fires every hour) and Amazon Bedrock support through Strands, so moving onto AWS services is a
-deployment step, not a rewrite.
+a ready one-file AWS CloudFormation deployment (deploy/paralitrace-aws.yaml: IAM role, security group and an
+Amazon EC2 instance that installs the app, serves it and refreshes live NASA fires every hour), and the assistant
+already targets Amazon Bedrock (Amazon Nova) through Strands, so moving onto AWS services is a deployment step,
+not a rewrite.
 
 Live demo: {DEMO}
 Code: {REPO}"""
