@@ -165,7 +165,12 @@ ul.after .pct { font-family: var(--display); font-weight: 800; font-size: 18px; 
 /* Map, printed */
 main { position: relative; min-width: 0; min-height: 0; }
 .map { position: absolute; inset: 0 0 88px 0; background: var(--paper); }
-.leaflet-tile-pane { filter: grayscale(1) contrast(1.25) brightness(1.08); mix-blend-mode: multiply; opacity: .7; }
+.leaflet-tile-pane { mix-blend-mode: multiply; }
+.tiles-detailed { filter: grayscale(1) contrast(1.15) brightness(1.02); opacity: .95; }
+.tiles-plain { filter: grayscale(1) contrast(1.5) brightness(.95); opacity: 1; }
+.basemap-switch { margin: 0 0 30px 10px; pointer-events: auto; }
+.basemap-switch button { background: var(--paper-hi); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+                         font-weight: 700; font-size: 13px; padding: 5px 10px; cursor: pointer; margin: 0; }
 .leaflet-container { font-family: var(--body); background: var(--paper); }
 .leaflet-tooltip.cl { background: var(--ink); color: var(--paper-hi); border: 0; border-radius: 0; box-shadow: none;
                       font-family: var(--display); font-weight: 700; font-size: 13px; padding: 1px 6px; }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { INK, LEFT_LABEL, band, hourAt, plural } from '../lib';
@@ -107,6 +107,7 @@ interface Props {
 }
 
 export function SmokeMap({ data, frame, city, plan, after, onSelectCity }: Props) {
+  const [basemap, setBasemap] = useState<'detailed' | 'plain'>('detailed');
   const snap = (after?.plumes[frame]) ?? data.plumes[frame];
   const afterIndex = useMemo(() => new Map(after?.cities.map(c => [c.id, c.hourly_index]) ?? []), [after]);
   const h = hourAt(data, frame);
@@ -119,9 +120,17 @@ export function SmokeMap({ data, frame, city, plan, after, onSelectCity }: Props
   return (
     <MapContainer className="map" bounds={REGION} boundsOptions={{ padding: [24, 24] }} zoomSnap={0.25} preferCanvas>
       <Panes />
-      {/* Esri's label-free grey canvas needs no key; the print filter in styles.css flattens it further. */}
-      <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        attribution="Tiles &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors" maxZoom={12} />
+      {/* Keyless Esri tiles. Detailed: state and district lines, rivers, roads and English place names that
+          fill in as you zoom. Plain: a quiet grey canvas with just boundaries and labels. */}
+      {basemap === 'detailed'
+        ? <TileLayer key="topo" url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+            attribution="Tiles &copy; Esri, HERE, Garmin, FAO, NOAA, USGS, &copy; OpenStreetMap contributors" maxZoom={13} className="tiles-detailed" />
+        : <>
+            <TileLayer key="grey" url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              attribution="Tiles &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors" maxZoom={13} className="tiles-plain" />
+            <TileLayer key="greyref" url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={13} className="tiles-plain" />
+          </>}
       <WindLayer wind={data.wind} t={snap.t} />
       <SmokeLayer snap={snap} massRef={massRef} />
       <FiresLayer clusters={data.clusters} />
@@ -152,6 +161,11 @@ export function SmokeMap({ data, frame, city, plan, after, onSelectCity }: Props
       })}
 
       <FlyTo city={city} />
+      <div className="basemap-switch leaflet-bottom leaflet-left">
+        <button className="leaflet-control" onClick={() => setBasemap(b => (b === 'detailed' ? 'plain' : 'detailed'))}>
+          {basemap === 'detailed' ? 'Plain map' : 'Detailed map'}
+        </button>
+      </div>
     </MapContainer>
   );
 }
