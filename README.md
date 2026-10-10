@@ -95,6 +95,9 @@ the writeup with the numbers from the latest runs.
 
 ## AWS
 
+- **AutoGluon** (AWS open source, AutoGluon-TimeSeries) learns a next-day PM2.5 forecast per city in the backtest,
+  retrained daily on past data only; combined with the smoke alerts it is the best rule on held-out November.
+  `pip install -r requirements-ml.txt` to include it.
 - **Strands Agents SDK** (AWS open source) powers the assistant: agent loop, tool calling and the five
   forecast tools. The model is pluggable: Gemini by default (free key), Amazon Bedrock, Anthropic or Ollama.
 - **Amazon EC2**: `deploy/` has a one-paste launch script that serves the app and refreshes live data hourly.
