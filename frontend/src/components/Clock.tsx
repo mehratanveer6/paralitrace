@@ -4,17 +4,16 @@ import type { Forecast } from '../types';
 
 interface Props { data: Forecast; frame: number; onRefreshed: () => Promise<void> }
 
+const longDate = (iso: string) =>
+  new Date(iso + 'T00:00:00+05:30').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+
 export function Clock({ data, frame, onRefreshed }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const snap = data.plumes[frame];
   const h = hourAt(data, frame);
   const mode = data.meta.mode;
-  const live = mode === 'live';
-  const issued = fmt(data.meta.forecast_start_epoch, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const replayDay = data.meta.replay_date
-    ? new Date(data.meta.replay_date + 'T00:00:00+05:30').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
-    : '';
+  const issued = fmt(data.meta.forecast_start_epoch, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   const fetchLive = async () => {
     setBusy(true); setError(null);
@@ -25,22 +24,31 @@ export function Clock({ data, frame, onRefreshed }: Props) {
 
   return (
     <div className="clock">
-      <div className="when">{fmt(snap.t, { weekday: 'short', hour: '2-digit', minute: '2-digit' })} IST</div>
-      {mode === 'replay' && <div className="rel">{fmt(snap.t, { day: 'numeric', month: 'short', year: 'numeric' })}</div>}
-      <div className="rel">{mode === 'replay'
-        ? (h === 0 ? 'When the forecast was issued' : `${h} hours after the forecast was issued`)
-        : (h === 0 ? 'Now' : `${h} hours from now`)}</div>
-      <div className="src">
-        {mode === 'live' && <span className="live">Live satellite fires</span>}
-        {mode === 'replay' && <span className="replay">Replay: real fires, {replayDay}</span>}
-        {mode === 'synthetic' && <span className="demo">Demo data, not real fires</span>}
+      {mode === 'replay' && data.meta.replay_date && (
+        <div className="src"><span className="replay">Replay of {longDate(data.meta.replay_date)}</span></div>
+      )}
+      {mode === 'live' && <div className="src"><span className="live">Live: today's satellite fires</span></div>}
+      {mode === 'synthetic' && <div className="src"><span className="demo">Demo data, not real fires</span></div>}
+
+      {/* the time shown on the map, which moves as the timeline plays */}
+      <div className="when">{fmt(snap.t, { weekday: 'short', day: 'numeric', month: 'short' })}, {fmt(snap.t, { hour: '2-digit', minute: '2-digit' })}</div>
+      <div className="rel">
+        IST, {mode === 'replay'
+          ? (h === 0 ? 'when the forecast was issued' : `${h} hours after the forecast was issued`)
+          : (h === 0 ? 'now' : `${h} hours from now`)}
+      </div>
+
+      <div className="note">
+        {mode === 'replay'
+          ? <>Real NASA fire detections from that day, forecast exactly as it would have been at {issued} the evening before. Not today's data.</>
+          : <>Forecast issued {issued} IST.</>}
+        {' '}
         {isHosted()
-          ? <span className="note">Hosted demo snapshot</span>
+          ? <>Hosted demo snapshot.</>
           : <button className="link" onClick={fetchLive} disabled={busy}>
-              {busy ? 'Fetching fires and winds' : live ? 'Refresh' : 'Fetch live fires'}
+              {busy ? 'Fetching today\'s fires and winds' : mode === 'live' ? 'Refresh' : 'Switch to today\'s fires'}
             </button>}
       </div>
-      <div className="note">Forecast issued {issued} IST</div>
       {error && <div className="err">{error}</div>}
     </div>
   );
