@@ -150,6 +150,7 @@ dialog.about .close { position: absolute; top: 10px; right: 14px; border: 0; bac
 /* Strands tool-call trace */
 .trace { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
 .trace-label { font-size: 12px; font-weight: 700; margin-right: 2px; }
+.note.model { margin: 0 0 8px; }
 .trace code { font-family: var(--body); font-size: 12px; background: var(--ink); color: var(--paper-hi); padding: 2px 7px; }
 
 /* Before / after plan */

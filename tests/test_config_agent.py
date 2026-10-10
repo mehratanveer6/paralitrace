@@ -116,3 +116,25 @@ def test_demo_export_and_examples_match_the_ui(tmp_path, monkeypatch):
     assert files == ["latest.json", "backtest.json", "answers.json"]
     rec = json.loads((demo / "answers.json").read_text(encoding="utf-8"))
     assert [r["question"] for r in rec] == export_demo.EXAMPLES and rec[0]["tools"][0]["name"] == "run_info"
+
+
+def test_on_aws_bedrock_comes_first_with_gemini_as_fallback(clean_env):
+    clean_env.setenv("PT_MODEL", "bedrock")
+    clean_env.setenv("AWS_REGION", "us-east-1")
+    ms = agent.candidates()
+    assert [type(m).__name__ for m in ms] == ["BedrockModel"] * 3
+    assert ms[0].config["model_id"] == "us.amazon.nova-pro-v1:0"
+    assert agent.model_label(ms[0]) == "Amazon Nova Pro on Amazon Bedrock"
+    clean_env.setenv("GEMINI_API_KEY", "k")
+    ms = agent.candidates()
+    assert [type(m).__name__ for m in ms][-3:] == ["GeminiModel"] * 3
+    assert agent.model_label(ms[-1]).endswith("(Gemini API)")
+
+
+def test_bedrock_access_errors_fall_through_to_the_next_model():
+    class AccessDeniedException(Exception):
+        pass
+    assert agent._model_unavailable(AccessDeniedException("You don't have access to the model"))
+    assert agent._model_unavailable(RuntimeError("Access to Bedrock models is not allowed for this account"))
+    assert agent._model_unavailable(RuntimeError("Unable to locate credentials"))
+    assert not agent._model_unavailable(ValueError("bad tool schema"))

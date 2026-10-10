@@ -143,33 +143,70 @@ def provider() -> str:
                             "put it in .env as GEMINI_API_KEY, and restart the server.")
 
 
+# Amazon Nova on Bedrock needs no approval form; cross-region inference profiles first.
+BEDROCK_MODELS = ("us.amazon.nova-pro-v1:0", "us.amazon.nova-lite-v1:0", "amazon.nova-pro-v1:0")
+MODEL_NAMES = {
+    "us.amazon.nova-pro-v1:0": "Amazon Nova Pro", "amazon.nova-pro-v1:0": "Amazon Nova Pro",
+    "us.amazon.nova-lite-v1:0": "Amazon Nova Lite",
+}
+
+
+def _gemini_models() -> list:
+    if not env("GEMINI_API_KEY"):
+        return []
+    from strands.models.gemini import GeminiModel
+    ids = [env("GEMINI_MODEL")] if env("GEMINI_MODEL") else list(GEMINI_MODELS)
+    return [GeminiModel(client_args={"api_key": env("GEMINI_API_KEY")}, model_id=m, params={"temperature": 0.3})
+            for m in ids]
+
+
+def _bedrock_models() -> list:
+    from strands.models.bedrock import BedrockModel
+    ids = [env("BEDROCK_MODEL_ID")] if env("BEDROCK_MODEL_ID") else list(BEDROCK_MODELS)
+    return [BedrockModel(model_id=m, region_name=env("AWS_REGION", "us-east-1"), temperature=0.3) for m in ids]
+
+
 def candidates() -> list:
-    """Model objects to try in order. Only Gemini has fallbacks, for model IDs a key can't use."""
+    """Model objects to try in order, each provider's alternatives after it. On AWS (PT_MODEL=bedrock)
+    Bedrock comes first and Gemini, if a key is set, is the fallback when Bedrock is unavailable."""
     p = provider()
     if p == "gemini":
-        from strands.models.gemini import GeminiModel
-        ids = [env("GEMINI_MODEL")] if env("GEMINI_MODEL") else list(GEMINI_MODELS)
-        return [GeminiModel(client_args={"api_key": env("GEMINI_API_KEY")}, model_id=m,
-                            params={"temperature": 0.3}) for m in ids]
+        return _gemini_models()
     if p == "anthropic":
         from strands.models.anthropic import AnthropicModel
         return [AnthropicModel(model_id=env("ANTHROPIC_MODEL", "claude-sonnet-4-6"), max_tokens=1500)]
     if p == "ollama":
         from strands.models.ollama import OllamaModel
         return [OllamaModel(env("OLLAMA_HOST", "http://localhost:11434"), model_id=env("OLLAMA_MODEL", "qwen2.5:7b"))]
-    from strands.models.bedrock import BedrockModel
-    kwargs = {"region_name": env("AWS_REGION", "us-east-1")}
-    if env("BEDROCK_MODEL_ID"):
-        kwargs["model_id"] = env("BEDROCK_MODEL_ID")
-    return [BedrockModel(**kwargs)]
+    return _bedrock_models() + _gemini_models()
+
+
+def model_label(m) -> str:
+    """Human-readable 'which model answered', shown beside each answer."""
+    mid = (getattr(m, "config", None) or {}).get("model_id", "") if not isinstance(m, str) else m
+    cls = type(m).__name__
+    if cls == "BedrockModel":
+        return f"{MODEL_NAMES.get(mid, mid)} on Amazon Bedrock"
+    if cls == "GeminiModel":
+        return f"{mid} (Gemini API)"
+    return str(mid or cls)
+
+
+def working_model_label() -> str | None:
+    return model_label(_working[0]) if _working else None
 
 
 _working: list = []   # the model that last answered, reused for later questions
 
 
 def _model_unavailable(e: Exception) -> bool:
-    msg = str(e).lower()
-    return any(k in msg for k in ("not found", "404", "not supported", "permission", "403", "quota", "429"))
+    """Errors that mean 'try the next model', not 'the question failed': missing access, unknown model id,
+    no credentials, quota."""
+    msg = f"{type(e).__name__} {e}".lower()
+    return any(k in msg for k in ("not found", "404", "not supported", "permission", "403", "quota", "429",
+                                  "accessdenied", "access denied", "not allowed", "not authorized",
+                                  "validationexception", "resourcenotfound", "credentials", "unrecognizedclient",
+                                  "invalid model", "model identifier"))
 
 
 def tool_trace(agent) -> list[dict]:

@@ -49,7 +49,7 @@ async function maybeJson(url: string): Promise<unknown | null> {
   } catch { return null; }
 }
 
-interface Recorded { question: string; answer: string; tools: ToolCall[] }
+interface Recorded { question: string; answer: string; tools: ToolCall[]; model?: string }
 
 export const api = {
   latest: async (): Promise<Forecast> => {
@@ -77,11 +77,11 @@ export const api = {
     if (hosted && snapshot?.plan_inputs) return planLocal(snapshot.plan_inputs, budget);
     return fetch(`/api/plan?budget=${budget}`).then(r => json<Plan>(r));
   },
-  ask: async (question: string): Promise<{ answer: string; tools?: ToolCall[]; recorded?: boolean }> => {
+  ask: async (question: string): Promise<{ answer: string; tools?: ToolCall[]; model?: string; recorded?: boolean }> => {
     if (hosted) {
       const rec = ((await maybeJson('/demo/answers.json')) as Recorded[] | null) ?? [];
       const hit = rec.find(r => r.question.trim().toLowerCase() === question.trim().toLowerCase());
-      if (hit) return { answer: hit.answer, tools: hit.tools, recorded: true };
+      if (hit) return { answer: hit.answer, tools: hit.tools, model: hit.model, recorded: true };
       throw new Error('In this hosted demo the assistant shows recorded answers to the three example questions. '
         + 'Free-form questions need the full app, which calls the model with a private key.');
     }
@@ -89,6 +89,6 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
-    }).then(r => json<{ answer: string; tools?: ToolCall[] }>(r));
+    }).then(r => json<{ answer: string; tools?: ToolCall[]; model?: string }>(r));
   },
 };

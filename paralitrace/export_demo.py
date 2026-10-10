@@ -37,13 +37,13 @@ def export(record_answers: bool = True, out_dir: str = DEMO_DIR) -> list[str]:
         raise SystemExit("No forecast to export. Run the pipeline first.")
 
     if record_answers:
-        from .agent import NoModelConfigured, ask_with_trace
+        from .agent import NoModelConfigured, ask_with_trace, working_model_label
         answers = []
         for q in EXAMPLES:
             try:
                 print(f"  recording: {q}")
                 a, tools = ask_with_trace(q)
-                answers.append({"question": q, "answer": a, "tools": tools})
+                answers.append({"question": q, "answer": a, "tools": tools, "model": working_model_label()})
             except NoModelConfigured as e:
                 print(f"  skipped answers: {e}")
                 break

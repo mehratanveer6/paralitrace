@@ -9,7 +9,7 @@ const EXAMPLES = [
   'Where should Punjab send 200 machines tomorrow?',
 ];
 
-interface Turn { q: string; a?: string; tools?: ToolCall[]; error?: string; recorded?: boolean }
+interface Turn { q: string; a?: string; tools?: ToolCall[]; model?: string; error?: string; recorded?: boolean }
 
 const args = (input: Record<string, unknown>) =>
   Object.entries(input).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(', ');
@@ -25,8 +25,8 @@ export function AskPane() {
     setBusy(true); setQ('');
     setTurns(t => [{ q: text }, ...t]);
     try {
-      const { answer, tools, recorded } = await api.ask(text);
-      setTurns(t => [{ q: text, a: answer, tools, recorded }, ...t.slice(1)]);
+      const { answer, tools, model, recorded } = await api.ask(text);
+      setTurns(t => [{ q: text, a: answer, tools, model, recorded }, ...t.slice(1)]);
     } catch (e) {
       setTurns(t => [{ q: text, error: (e as Error).message }, ...t.slice(1)]);
     }
@@ -44,7 +44,8 @@ export function AskPane() {
       </div>
       <button className="go" onClick={() => ask(q)} disabled={busy || !q.trim()}>Ask</button>
       <span className="note hint">Ctrl + Enter also asks</span>
-      <p className="note built">Built with the Strands Agents SDK (AWS open source). Answers come only from the forecast's own numbers.</p>
+      <p className="note built">Built with the Strands Agents SDK (AWS open source), running on Amazon Bedrock where available.
+        Answers come only from the forecast's own numbers.</p>
 
       {turns.map((t, i) => (
         <div className="turn" key={turns.length - i}>
@@ -55,6 +56,7 @@ export function AskPane() {
               {t.tools.map((c, j) => <code key={j}>{c.name}({args(c.input)})</code>)}
             </div>
           )}
+          {t.model && <p className="note model">Answered by <b>{t.model}</b></p>}
           {t.recorded && <p className="note">Recorded answer from the full app, on this same forecast.</p>}
           {t.a != null && <div className="ans"><Markdown text={t.a} /></div>}
           {t.error && <div className="err">{t.error}</div>}
