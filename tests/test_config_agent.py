@@ -85,13 +85,14 @@ def test_report_fills_numbers_and_never_invents_missing_ones():
                       "false_alarm_pct": 25, "median_correlation": 0.55},
           "heldout": {"train": "Oct 2025", "test": "Nov 2025", "spike_days": 90, "onset_days": 40, "test_city_days": 400,
                       "methods": [
+                          {"key": "combined", "label": "X", "caught": 70, "false_alarm_pct": 45, "onsets_caught": 12, "mae": None},
                           {"key": "persistence", "label": "Repeat", "caught": 50, "false_alarm_pct": 40, "onsets_caught": 0, "mae": 60.0},
                           {"key": "smoke_only", "label": "S", "caught": 45, "false_alarm_pct": 50, "onsets_caught": 18, "mae": None},
                           {"key": "calibrated_no_smoke", "label": "C0", "caught": 52, "false_alarm_pct": 38, "onsets_caught": 2, "mae": 55.0},
                           {"key": "calibrated", "label": "C", "caught": 61, "false_alarm_pct": 33, "onsets_caught": 12, "mae": 48.5}]}}
     text = build(latest, bt)
-    for frag in ("61.2%", "30.1%", "40 fire locations", "4 Nov 2025", "Delhi 35% less smoke", "61 of 90",
-                 "48.5", "Strands Agents SDK", "AWS open source:", "AWS services:"):
+    for frag in ("61.2%", "30.1%", "40 fire locations", "4 Nov 2025", "Delhi 35% less smoke", "70 of 90",
+                 "instead of 50", "12 of 40 new smoky spells", "Strands Agents SDK", "AWS open source:", "AWS services:"):
         assert frag in text, frag
     assert "[[" not in text and "demo data" not in text and "[X]" not in text
     empty = build(None, None)

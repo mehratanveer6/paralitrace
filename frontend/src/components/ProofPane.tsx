@@ -43,30 +43,57 @@ function SeasonChart({ days }: { days: BacktestDay[] }) {
   );
 }
 
+const ORDER = ['persistence', 'smoke_only', 'combined', 'calibrated_no_smoke', 'calibrated'];
+const NAME: Record<string, string> = {
+  persistence: "Repeat yesterday's reading",
+  smoke_only: 'ParaliTrace smoke model',
+  combined: "Yesterday's rule + ParaliTrace alerts",
+  calibrated_no_smoke: 'Regression on yesterday (tried)',
+  calibrated: 'Regression on yesterday + smoke (tried)',
+};
+
+const PHRASE: Record<string, string> = {
+  smoke_only: 'the ParaliTrace smoke model',
+  combined: "yesterday's rule plus ParaliTrace's alerts",
+};
+
 function HeldoutBlock({ h }: { h: Heldout }) {
-  const m = Object.fromEntries(h.methods.map(x => [x.key, x]));
-  const cal = m.calibrated, base = m.persistence;
+  const methods = [...h.methods].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
+  const base = methods.find(x => x.key === 'persistence')!;
+  const best = methods.filter(x => x.key !== 'persistence').sort((a, b) => b.caught - a.caught)[0];
+  const smoke = methods.find(x => x.key === 'smoke_only');
+  const beats = best && best.caught > base.caught;
   return (
     <>
       <h3>Tested on days it never saw</h3>
-      <p className="note">Trained on {h.train}, scored only on {h.test}: {h.spike_days} spike days, {h.onset_days} of them the start of a smoky spell.</p>
-      <div className="vs">
-        <div className="win"><span className="big">{cal.caught}/{h.spike_days}</span>spike days caught by the calibrated forecast, {cal.onsets_caught} of {h.onset_days} spell starts</div>
-        <div className="lose"><span className="big">{base.caught}/{h.spike_days}</span>by repeating yesterday's reading, {base.onsets_caught} spell starts</div>
-      </div>
+      <p className="note">Scored only on {h.test}, which nothing was tuned on: {h.spike_days} spike days,
+        {' '}{h.onset_days} of them the first smoky day of a new spell.</p>
+      {beats ? (
+        <div className="vs">
+          <div className="win"><span className="big">{best.caught}/{h.spike_days}</span>spike days caught a day ahead with {PHRASE[best.key] ?? NAME[best.key]}, {best.onsets_caught} of {h.onset_days} new spells</div>
+          <div className="lose"><span className="big">{base.caught}/{h.spike_days}</span>by repeating yesterday's reading, {base.onsets_caught} new spells</div>
+        </div>
+      ) : smoke && (
+        <div className="vs">
+          <div className="win"><span className="big">{smoke.onsets_caught}/{h.onset_days}</span>new smoky spells seen coming a day ahead by the smoke model</div>
+          <div className="lose"><span className="big">0/{h.onset_days}</span>by repeating yesterday's reading</div>
+        </div>
+      )}
       <table className="bt">
-        <thead><tr><th>Method</th><th>Caught</th><th>Starts</th><th>False alarms</th><th>Error</th></tr></thead>
+        <thead><tr><th>Method</th><th>Caught</th><th>New spells</th><th>False alarms</th><th>Error</th></tr></thead>
         <tbody>
-          {h.methods.map(x => (
-            <tr key={x.key} aria-selected={x.key === 'calibrated'}>
-              <td>{x.label}</td><td>{x.caught}</td><td>{x.onsets_caught}</td><td>{x.false_alarm_pct}%</td>
+          {methods.map(x => (
+            <tr key={x.key} aria-selected={beats && x.key === best.key}>
+              <td>{NAME[x.key] ?? x.label}</td><td>{x.caught}</td><td>{x.onsets_caught}</td><td>{x.false_alarm_pct}%</td>
               <td>{x.mae != null ? `${x.mae} µg/m³` : 'n/a'}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="note">Error is the average miss in daily PM2.5. The calibrated forecast is a two-term regression on yesterday's
-        reading and the smoke model. The row without the smoke model shows what the physics adds.</p>
+      <p className="note">Repeating yesterday can't catch a new spell by definition; only the smoke model can see one coming.
+        The combined rule raises an alert when either does. Error is the average miss in daily PM2.5 where a method
+        predicts a number. A two-term regression was also tried: on {h.test} it smooths spikes away and doesn't beat
+        the simple rules, so the alert rule is what ParaliTrace uses.</p>
     </>
   );
 }

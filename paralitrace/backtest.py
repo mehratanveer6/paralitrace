@@ -262,6 +262,35 @@ def score(pred: pd.DataFrame, obs: dict[str, pd.Series], start: str, end: str) -
     }
 
 
+def add_combined(doc: dict) -> dict:
+    """Add the operational rule to the held-out comparison: alert when yesterday was a spike OR the smoke
+    model calls one. Repeating yesterday catches spells already under way; the smoke model is the only
+    source that can see a new spell coming. Scored from the per-day records on the held-out days, with
+    exactly the same day filter as the other methods (needs today's and yesterday's monitor reading)."""
+    h = doc.get("heldout")
+    if not h:
+        return doc
+    start = h.get("test_start") or datetime.strptime(h["test"], "%b %Y").date().isoformat()  # e.g. "Nov 2025"
+    caught = called = onsets_caught = 0
+    for c in doc["cities"]:
+        prev = None                                    # yesterday's spike flag; None when no reading
+        for d in c["days"]:
+            have = d["observed_pm25"] is not None
+            if d["date"] >= start and have and prev is not None:
+                call = prev or d["predicted_spike"]
+                spike = d["observed_spike"]
+                caught += call and spike
+                called += call
+                onsets_caught += call and spike and not prev
+            prev = d["observed_spike"] if have else None
+    h["methods"] = [m for m in h["methods"] if m["key"] != "combined"] + [{
+        "key": "combined", "label": "Yesterday's rule + smoke alerts",
+        "caught": int(caught), "false_alarm_pct": round(100 * (called - caught) / called) if called else 0,
+        "onsets_caught": int(onsets_caught), "mae": None,
+    }]
+    return doc
+
+
 def heldout(df: pd.DataFrame, d0: date, d1: date) -> dict | None:
     """Calibrate the smoke index into a PM2.5 forecast on the first part of the season, score on the rest.
 
@@ -321,7 +350,7 @@ def heldout(df: pd.DataFrame, d0: date, d1: date) -> dict | None:
         })
     month = lambda a, b: f"{a:%b %Y}" if (a.year, a.month) == (b.year, b.month) else f"{a.day} {a:%b} - {b.day} {b:%b %Y}"
     return {
-        "train": month(d0, split - timedelta(days=1)), "test": month(split, d1),
+        "train": month(d0, split - timedelta(days=1)), "test": month(split, d1), "test_start": split.isoformat(),
         "test_city_days": int(len(test)), "spike_days": int(spike.sum()), "onset_days": int(onset.sum()),
         "methods": methods,
     }
@@ -337,7 +366,7 @@ def run(start: str, end: str) -> dict:
     print("Winds (Open-Meteo ERA5 archive)"); wind = fetch_season_winds(start, end)
     print("Monitors (OpenAQ)"); obs = season_pm25(start, end, akey)
     print("Replaying forecasts"); pred = replay(fires, wind, _days(start, end))
-    doc = score(pred, obs, start, end)
+    doc = add_combined(score(pred, obs, start, end))
     with open(os.path.join(OUTPUT_DIR, "backtest.json"), "w") as f:
         json.dump(doc, f)
     return doc

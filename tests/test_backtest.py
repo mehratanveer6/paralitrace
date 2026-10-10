@@ -102,7 +102,7 @@ def test_backtest_document_matches_the_proof_tab_contract(mocked):
     assert c["days"][5]["observed_pm25"] is None          # low-coverage day dropped
     assert (mocked / "backtest.json").exists()
     h = doc["heldout"]
-    assert h and [x["key"] for x in h["methods"]] == ["persistence", "smoke_only", "calibrated_no_smoke", "calibrated"]
+    assert h and [x["key"] for x in h["methods"]] == ["persistence", "smoke_only", "calibrated_no_smoke", "calibrated", "combined"]
 
 
 def test_rerun_uses_the_cache(mocked, monkeypatch):
@@ -166,3 +166,17 @@ def test_heldout_calibration_uses_the_smoke_signal_when_it_is_real():
     assert h["train"] == "Oct 2025" and h["test"] == "Nov 2025"
     assert m["calibrated"]["mae"] < m["calibrated_no_smoke"]["mae"] < m["persistence"]["mae"]
     assert m["calibrated"]["onsets_caught"] >= m["persistence"]["onsets_caught"] == 0
+
+
+def test_combined_rule_is_scored_on_the_same_held_out_days():
+    def days(flags):
+        return [{"date": f"2025-11-{i + 1:02d}", "observed_pm25": None if o is None else 100.0,
+                 "observed_spike": bool(o), "predicted_spike": bool(p)} for i, (o, p) in enumerate(flags)]
+    #            obs spike, smoke call    (None = monitor offline)
+    city = days([(0, 0), (1, 1), (1, 0), (0, 1), (None, 1), (1, 1), (0, 0)])
+    doc = {"heldout": {"test": "Nov 2025", "methods": []}, "cities": [{"days": city}]}
+    m = backtest.add_combined(doc)["heldout"]["methods"][0]
+    # scored days: 2,3,4 (day 5 offline, day 6 has no yesterday, day 7 scored, day 1 no yesterday)
+    # day2 spike, yest 0, call 1 -> caught onset; day3 spike, yest 1 -> caught; day4 no spike, call -> false;
+    # day7 no spike, yest spike(day6) -> false
+    assert m["caught"] == 2 and m["onsets_caught"] == 1 and m["false_alarm_pct"] == 50

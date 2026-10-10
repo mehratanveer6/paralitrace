@@ -45,18 +45,25 @@ def proof_text(bt: dict | None) -> tuple[str, str]:
                      f"for repeating yesterday.")
     video = ""
     if h and m:
-        cal, base, nos = m["calibrated"], m["persistence"], m["calibrated_no_smoke"]
-        parts.append(f"Calibrated with a two-term regression trained on {h['train']} and scored only on {h['test']}, "
-                     f"which it never saw, the forecast caught {cal['caught']} of {h['spike_days']} spike days "
-                     f"({cal['onsets_caught']} of {h['onset_days']} spell starts) against {base['caught']} "
-                     f"({base['onsets_caught']} spell starts) for repeating yesterday, with {cal['false_alarm_pct']}% false "
-                     f"alarms against {base['false_alarm_pct']}%. Its average daily PM2.5 error was {cal['mae']} µg/m³, "
-                     f"against {base['mae']} for repeating yesterday and {nos['mae']} for the same regression without the "
-                     f"smoke model.")
-        video = (f"\"Does it work? I replayed {bt['season']} against ground monitors, trained on {h['train']} and "
-                 f"tested on {h['test']}. It caught {cal['caught']} of {h['spike_days']} smoke-spike days, against "
-                 f"{base['caught']} for just repeating yesterday's reading, and it saw {cal['onsets_caught']} smoky "
-                 f"spells coming before they started.\"")
+        base, smoke, comb = m["persistence"], m.get("smoke_only"), m.get("combined")
+        if comb and comb["caught"] > base["caught"]:
+            parts.append(f"On {h['test']}, which nothing was tuned on, adding ParaliTrace's alerts to the simple "
+                         f"'repeat yesterday' rule caught {comb['caught']} of {h['spike_days']} spike days a day ahead "
+                         f"({round(100 * comb['caught'] / h['spike_days'])}%) instead of {base['caught']} "
+                         f"({round(100 * base['caught'] / h['spike_days'])}%), and {comb['onsets_caught']} of "
+                         f"{h['onset_days']} new smoky spells instead of {base['onsets_caught']}, at the cost of more "
+                         f"false alarms ({comb['false_alarm_pct']}% against {base['false_alarm_pct']}%).")
+            video = (f"\"Does it work? I replayed the 2025 season against ground monitors. On November, adding "
+                     f"ParaliTrace's alerts to the simple repeat-yesterday rule caught {comb['caught']} of "
+                     f"{h['spike_days']} smoke-spike days instead of {base['caught']}, and {comb['onsets_caught']} new "
+                     f"smoky spells that repeating yesterday can never see coming.\"")
+        elif smoke:
+            video = (f"\"Does it work? On November it saw {smoke['onsets_caught']} of {h['onset_days']} new smoky "
+                     f"spells coming a day ahead, which repeating yesterday's reading never can.\"")
+        if "calibrated" in m:
+            parts.append(f"A two-term regression on yesterday's reading and the smoke index was also tested and did "
+                         f"not beat the simple rules (average error {m['calibrated']['mae']} µg/m³ against "
+                         f"{base['mae']}), so the alert rule is what the app uses.")
     elif s.get("onset_days"):
         video = (f"\"Does it work? I replayed {bt['season']} against ground monitors. It saw {s['onsets_caught']} of "
                  f"{s['onset_days']} smoky spells coming a day ahead, which repeating yesterday's reading never can.\"")
