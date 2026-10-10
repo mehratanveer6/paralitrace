@@ -157,8 +157,9 @@ OpenAQ ground-monitor PM2.5, OpenStreetMap and Esri basemaps.
 ## Limits
 
 The tracer is a simplified two-dimensional model, not a research model such as HYSPLIT. The smoke index is
-relative; the calibration step turns it into a PM2.5 forecast. Tomorrow's burning is assumed to resemble
-today's. The backtest uses reanalysis winds in place of the forecasts available at the time.
+relative: it drives spike alerts that are checked against monitors, not a PM2.5 concentration forecast. Tomorrow's
+burning is assumed to resemble today's. The backtest uses reanalysis winds in place of the forecasts available at
+the time, and its false-alarm rate is high.
 
 ## Built with
 
