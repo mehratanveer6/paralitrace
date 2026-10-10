@@ -72,9 +72,10 @@ def backtest():
 @app.post("/api/ask")
 def ask(req: AskRequest):
     _latest()
-    from paralitrace.agent import NoModelConfigured, ask as agent_ask
+    from paralitrace.agent import NoModelConfigured, ask_with_trace
     try:
-        return {"answer": agent_ask(req.question)}
+        answer, tools = ask_with_trace(req.question)
+        return {"answer": answer, "tools": tools}
     except NoModelConfigured as e:
         raise HTTPException(503, str(e))
     except Exception as e:

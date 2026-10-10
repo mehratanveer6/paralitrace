@@ -112,6 +112,25 @@ export interface BacktestCity {
   days: BacktestDay[];
 }
 
+export interface HeldoutMethod {
+  key: 'persistence' | 'smoke_only' | 'calibrated_no_smoke' | 'calibrated';
+  label: string;
+  caught: number;
+  false_alarm_pct: number;
+  onsets_caught: number;
+  mae: number | null;           // mean absolute error in PM2.5, µg/m³
+}
+
+/** Calibrated forecast trained on the first part of the season, scored only on the rest. */
+export interface Heldout {
+  train: string;
+  test: string;
+  test_city_days: number;
+  spike_days: number;
+  onset_days: number;
+  methods: HeldoutMethod[];
+}
+
 export interface Backtest {
   season: string;                 // e.g. "Oct-Nov 2025"
   start: string;
@@ -130,14 +149,34 @@ export interface Backtest {
     onset_days?: number;          // first day of each spike episode, which "repeat yesterday" can never catch
     onsets_caught?: number;
   };
+  heldout?: Heldout | null;
   cities: BacktestCity[];
 }
+
+export interface CounterfactualCity {
+  id: string;
+  name: string;
+  hourly_index: number[];
+  before_peak_risk: Risk;
+  after_peak_risk: Risk;
+  reduction_pct: number;
+}
+
+/** The same forecast with the default plan's fires stopped. */
+export interface Counterfactual {
+  budget_fires: number;
+  plumes: Snapshot[];
+  cities: CounterfactualCity[];
+}
+
+export interface ToolCall { name: string; input: Record<string, unknown> }
 
 export interface Forecast {
   meta: Meta;
   clusters: Cluster[];
   cities: City[];
   plan: Plan;
+  counterfactual?: Counterfactual;
   plumes: Snapshot[];
   wind: Wind;
 }

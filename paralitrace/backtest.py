@@ -204,7 +204,7 @@ def replay(fires: pd.DataFrame, wind: winds_mod.WindField, days: list[date]) -> 
 def score(pred: pd.DataFrame, obs: dict[str, pd.Series], start: str, end: str) -> dict:
     """Build the Backtest document the Proof tab renders."""
     cities, tot = [], dict(spikes=0, caught=0, predicted=0, false=0, base_caught=0, onsets=0, onsets_caught=0)
-    corrs = []
+    corrs, frames = [], []
     for r in RECEPTORS:
         p = pred[pred.city == r.id].set_index("date")["predicted"]
         o = obs.get(r.id, pd.Series(dtype=float)).reindex(p.index)
@@ -226,6 +226,8 @@ def score(pred: pd.DataFrame, obs: dict[str, pd.Series], start: str, end: str) -
         tot["predicted"] += int((pred_spike & valid).sum()); tot["false"] += false
         tot["base_caught"] += int((obs_spike & yest).sum())
         tot["onsets"] += int(onset.sum()); tot["onsets_caught"] += int((onset & pred_spike).sum())
+        frames.append(pd.DataFrame({"city": r.id, "date": p.index, "p": p.values, "o": o.values,
+                                    "o_prev": o.shift(1).values, "o_thr": o_thr, "smoke_spike": pred_spike.values}))
         cities.append({
             "id": r.id, "name": r.name, "spike_days": int(obs_spike.sum()), "spikes_caught": caught,
             "false_alarms": false, "correlation": None if rho is None else round(rho, 2),
@@ -255,7 +257,73 @@ def score(pred: pd.DataFrame, obs: dict[str, pd.Series], start: str, end: str) -
             "baseline_hit_rate_pct": pct(tot["base_caught"], tot["spikes"]),
             "onset_days": tot["onsets"], "onsets_caught": tot["onsets_caught"],
         },
+        "heldout": heldout(pd.concat(frames, ignore_index=True), d0, d1),
         "cities": sorted(cities, key=lambda c: -c["spike_days"]),
+    }
+
+
+def heldout(df: pd.DataFrame, d0: date, d1: date) -> dict | None:
+    """Calibrate the smoke index into a PM2.5 forecast on the first part of the season, score on the rest.
+
+    log PM2.5(day) = a + b * log PM2.5(day before) + c * log(1 + smoke index(day)), fitted by least squares
+    on every city's training days (model output statistics). An ablation without the smoke term shows
+    whether the smoke model adds anything beyond yesterday's reading. All methods are scored on the same
+    held-out days against the same spike definition.
+    """
+    split = date(d1.year, d1.month, 1) if (d0.year, d0.month) != (d1.year, d1.month) else d0 + (d1 - d0) / 2
+    df = df.dropna(subset=["o", "o_prev"])
+    df = df[(df.o > 0) & (df.o_prev > 0)].copy()
+    df["d"] = pd.to_datetime(df.date).dt.date
+    train, test = df[df.d < split], df[df.d >= split].copy()
+    if len(train) < 30 or len(test) < 30:
+        return None
+
+    def design(x: pd.DataFrame, smoke: bool) -> np.ndarray:
+        cols = [np.ones(len(x)), np.log(x.o_prev.to_numpy())]
+        if smoke:
+            cols.append(np.log1p(x.p.to_numpy()))
+        return np.column_stack(cols)
+
+    y = np.log(train.o.to_numpy())
+    preds = {}
+    for name, smoke in (("calibrated_no_smoke", False), ("calibrated", True)):
+        beta, *_ = np.linalg.lstsq(design(train, smoke), y, rcond=None)
+        preds[name] = np.exp(design(test, smoke) @ beta)
+
+    spike = (test.o >= test.o_thr).to_numpy()
+    onset = spike & ~(test.o_prev >= test.o_thr).to_numpy()
+    calls = {
+        "persistence": (test.o_prev >= test.o_thr).to_numpy(),
+        "smoke_only": test.smoke_spike.astype(bool).to_numpy(),
+        "calibrated_no_smoke": preds["calibrated_no_smoke"] >= test.o_thr.to_numpy(),
+        "calibrated": preds["calibrated"] >= test.o_thr.to_numpy(),
+    }
+    mae = {
+        "persistence": float(np.abs(test.o - test.o_prev).mean()),
+        "calibrated_no_smoke": float(np.abs(test.o.to_numpy() - preds["calibrated_no_smoke"]).mean()),
+        "calibrated": float(np.abs(test.o.to_numpy() - preds["calibrated"]).mean()),
+    }
+    labels = {
+        "persistence": "Repeat yesterday's PM2.5",
+        "smoke_only": "Smoke model alone",
+        "calibrated_no_smoke": "Calibrated on yesterday only",
+        "calibrated": "Calibrated on yesterday + smoke model",
+    }
+    methods = []
+    for key, call in calls.items():
+        n_pred = int(call.sum())
+        methods.append({
+            "key": key, "label": labels[key],
+            "caught": int((call & spike).sum()),
+            "false_alarm_pct": round(100 * int((call & ~spike).sum()) / n_pred) if n_pred else 0,
+            "onsets_caught": int((call & onset).sum()),
+            "mae": round(mae[key], 1) if key in mae else None,
+        })
+    month = lambda a, b: f"{a:%b %Y}" if (a.year, a.month) == (b.year, b.month) else f"{a.day} {a:%b} - {b.day} {b:%b %Y}"
+    return {
+        "train": month(d0, split - timedelta(days=1)), "test": month(split, d1),
+        "test_city_days": int(len(test)), "spike_days": int(spike.sum()), "onset_days": int(onset.sum()),
+        "methods": methods,
     }
 
 

@@ -75,16 +75,25 @@ def test_ask_does_not_hide_real_errors(clean_env):
 
 def test_report_fills_numbers_and_never_invents_missing_ones():
     from paralitrace.report import build
-    latest = {"meta": {"mode": "live", "data_label": "NASA FIRMS VIIRS fires"},
-              "plan": {"exposure_avoided_pct_of_preventable": 61.2, "fires_targeted": 150,
-                       "naive_biggest_fires_pct_of_preventable": 30.1}}
+    latest = {"meta": {"mode": "replay", "data_label": "Replay of 4 Nov 2025: NASA FIRMS archive fires + ERA5 winds"},
+              "plan": {"exposure_avoided_pct_of_preventable": 61.2, "budget_fires": 40,
+                       "naive_biggest_fires_pct_of_preventable": 30.1},
+              "counterfactual": {"cities": [{"name": "Delhi", "reduction_pct": 34.6}, {"name": "Karnal", "reduction_pct": 20.0}]}}
     bt = {"season": "Oct-Nov 2025", "cities": [1, 2],
           "summary": {"spikes_caught": 20, "spike_days": 30, "hit_rate_pct": 67, "baseline_hit_rate_pct": 50,
                       "baseline_label": "repeating yesterday's PM2.5", "onset_days": 8, "onsets_caught": 5,
-                      "false_alarm_pct": 25, "median_correlation": 0.55}}
+                      "false_alarm_pct": 25, "median_correlation": 0.55},
+          "heldout": {"train": "Oct 2025", "test": "Nov 2025", "spike_days": 90, "onset_days": 40, "test_city_days": 400,
+                      "methods": [
+                          {"key": "persistence", "label": "Repeat", "caught": 50, "false_alarm_pct": 40, "onsets_caught": 0, "mae": 60.0},
+                          {"key": "smoke_only", "label": "S", "caught": 45, "false_alarm_pct": 50, "onsets_caught": 18, "mae": None},
+                          {"key": "calibrated_no_smoke", "label": "C0", "caught": 52, "false_alarm_pct": 38, "onsets_caught": 2, "mae": 55.0},
+                          {"key": "calibrated", "label": "C", "caught": 61, "false_alarm_pct": 33, "onsets_caught": 12, "mae": 48.5}]}}
     text = build(latest, bt)
-    assert "61.2%" in text and "30.1%" in text and "20 of 30" in text and "5 of 8" in text
-    assert "[[" not in text and "demo data" not in text
+    for frag in ("61.2%", "30.1%", "40 fire locations", "4 Nov 2025", "Delhi 35% less smoke", "61 of 90",
+                 "48.5", "Strands Agents SDK", "AWS open source:", "AWS services:"):
+        assert frag in text, frag
+    assert "[[" not in text and "demo data" not in text and "[X]" not in text
     empty = build(None, None)
     assert "Not run yet" in empty and "Run the pipeline" in empty
     assert "demo data" in build({**latest, "meta": {"mode": "synthetic"}}, None)

@@ -80,3 +80,20 @@ def test_auto_budget_is_a_quarter_of_the_fires_that_matter():
     assert auto_budget(tr) == 10          # 25% of the 40 fires that reach Delhi; the 40 far ones don't count
     p = plan_interventions(tr, budget_fires=auto_budget(tr))
     assert 0 < p["exposure_avoided_pct_of_preventable"] < 100
+
+
+def test_counterfactual_removes_exactly_the_prevented_smoke():
+    rng = np.random.default_rng(3)
+    fires = [FireCluster(f"c{i}", 29.0 + rng.uniform(0, 1.5), 75.0 + rng.uniform(0, 1.5), rng.uniform(5, 60),
+                         int(rng.integers(1, 6)), T0 - 5 * 3600) for i in range(25)]
+    p = ModelParams(horizon_hours=48)
+    w = uniform_wind(2.5, -1.5, hours=120)
+    base = simulate(fires, w, T0, p)
+    stop = {i for i in range(25) if base.dose_by_src_projected[:, i].sum() > 0}
+    stop = set(sorted(stop)[:5])
+    after = simulate(fires, w, T0, p, stopped=stop)
+    removed = base.dose_by_src_projected[:, sorted(stop)].sum()
+    assert removed > 0
+    assert base.dose.sum() - after.dose.sum() == pytest.approx(removed, rel=1e-9)
+    keep = [i for i in range(25) if i not in stop]
+    assert np.allclose(base.dose_by_src[:, keep], after.dose_by_src[:, keep])   # everyone else untouched

@@ -172,7 +172,24 @@ def _model_unavailable(e: Exception) -> bool:
     return any(k in msg for k in ("not found", "404", "not supported", "permission", "403", "quota", "429"))
 
 
+def tool_trace(agent) -> list[dict]:
+    """The tool calls Strands made while answering, in order: name and arguments."""
+    calls = []
+    for msg in getattr(agent, "messages", []) or []:
+        if msg.get("role") != "assistant":
+            continue
+        for block in msg.get("content", []):
+            use = block.get("toolUse") if isinstance(block, dict) else None
+            if use:
+                calls.append({"name": use.get("name"), "input": use.get("input") or {}})
+    return calls
+
+
 def ask(question: str) -> str:
+    return ask_with_trace(question)[0]
+
+
+def ask_with_trace(question: str) -> tuple[str, list[dict]]:
     """Fresh agent per question so conversations don't leak between users."""
     models = _working or candidates()
     last: Exception | None = None
@@ -181,7 +198,7 @@ def ask(question: str) -> str:
             agent = Agent(model=m, tools=TOOLS, system_prompt=SYSTEM_PROMPT, callback_handler=None)
             answer = str(agent(question)).strip()
             _working[:] = [m]
-            return answer
+            return answer, tool_trace(agent)
         except Exception as e:
             last = e
             if not _model_unavailable(e):

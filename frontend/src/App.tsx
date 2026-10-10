@@ -25,12 +25,14 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('cities');
   const [cityId, setCityId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [showAfter, setShowAfter] = useState(false);
 
   const reload = useCallback(async () => {
     const d = await api.latest();
     setData(d);
     setFrame(f => Math.min(f, d.plumes.length - 1));
     setPlan(null);
+    setShowAfter(false);
   }, []);
 
   useEffect(() => { reload().catch(() => setFailed(true)); }, [reload]);
@@ -65,6 +67,8 @@ export default function App() {
   }
 
   const city = data.cities.find(c => c.id === cityId) ?? null;
+  const cf = data.counterfactual;
+  const after = showAfter && cf && plan && plan.budget_fires === cf.budget_fires ? cf : null;
   const selectCity = (id: string) => { setCityId(id); setTab('cities'); };
 
   return (
@@ -83,13 +87,15 @@ export default function App() {
             : <CitiesPane data={data} onSelect={selectCity} />}
         </section>
         <section className="pane" hidden={tab !== 'plan'}>
-          <PlanPane key={data.meta.generated_utc} plan={plan} onPlan={setPlan} defaultBudget={data.plan.budget_fires} />
+          <PlanPane key={data.meta.generated_utc} plan={plan} onPlan={setPlan} defaultBudget={data.plan.budget_fires}
+            counterfactual={data.counterfactual} showAfter={showAfter} onShowAfter={setShowAfter} />
         </section>
         <section className="pane" hidden={tab !== 'ask'}><AskPane /></section>
         <section className="pane" hidden={tab !== 'proof'}><ProofPane /></section>
       </aside>
       <main>
-        <SmokeMap data={data} frame={frame} city={city} plan={plan} onSelectCity={selectCity} />
+        <SmokeMap data={data} frame={frame} city={city} plan={plan} after={after} onSelectCity={selectCity} />
+        {after && <div className="after-banner">With the planned fires stopped</div>}
         <div className="legend" aria-hidden="true">
           <div><span className="sw" style={{ background: 'var(--fire)' }} />Fire</div>
           <div><span className="sw" style={{ background: 'var(--ink)' }} />Smoke</div>

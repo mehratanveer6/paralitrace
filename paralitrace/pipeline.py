@@ -15,12 +15,12 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
-from .config import OUTPUT_DIR, PARAMS, env
+from .config import OUTPUT_DIR, PARAMS, RECEPTORS, env
 from .data import fires as fires_mod
 from .data import winds as winds_mod
 from .data.fires import FireCluster
 from .data.synthetic import synthetic_fires, synthetic_winds
-from .model.analysis import auto_budget, city_forecasts, plan_interventions
+from .model.analysis import auto_budget, city_forecasts, plan_interventions, risk_band
 from .model.tracer import TraceResult, simulate
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -50,6 +50,7 @@ def run(mode: str = "synthetic", budget_fires: int | None = None, out_dir: str =
     clusters = fires_mod.cluster_fires(df)
     trace = simulate(clusters, wind, t0)
     budget = budget_fires or auto_budget(trace)
+    plan = plan_interventions(trace, budget_fires=budget)
     result = {
         "meta": {
             "mode": mode,
@@ -66,7 +67,8 @@ def run(mode: str = "synthetic", budget_fires: int | None = None, out_dir: str =
         },
         "clusters": [c.to_dict() for c in clusters],
         "cities": city_forecasts(trace),
-        "plan": plan_interventions(trace, budget_fires=budget),
+        "plan": plan,
+        "counterfactual": counterfactual(clusters, wind, t0, trace, plan),
         "plumes": trace.snapshots,
         "wind": wind.to_json(every=3),
     }
@@ -77,6 +79,25 @@ def run(mode: str = "synthetic", budget_fires: int | None = None, out_dir: str =
         json.dump(result, f)
     save_trace(trace, out_dir)
     return result
+
+
+def counterfactual(clusters, wind, t0, trace: TraceResult, plan: dict) -> dict:
+    """The same forecast with the plan's fires stopped: what the map and cities would look like."""
+    index = {c.id: i for i, c in enumerate(clusters)}
+    stopped = {index[c["cluster_id"]] for c in plan["clusters"] if c["cluster_id"] in index}
+    after = simulate(clusters, wind, t0, stopped=stopped)
+    cities = []
+    for i, r in enumerate(RECEPTORS):
+        b, a = trace.dose[i], after.dose[i]
+        if b.sum() <= 0:
+            continue
+        cities.append({
+            "id": r.id, "name": r.name, "hourly_index": a.round(3).tolist(),
+            "before_peak_risk": risk_band(float(b.max())), "after_peak_risk": risk_band(float(a.max())),
+            "reduction_pct": round(100 * (1 - a.sum() / b.sum()), 1),
+        })
+    cities.sort(key=lambda c: -c["reduction_pct"])
+    return {"budget_fires": plan["budget_fires"], "plumes": after.snapshots, "cities": cities}
 
 
 def _long_date(iso: str) -> str:
@@ -151,6 +172,8 @@ def main():
     for c in sorted(r["cities"], key=lambda c: -c["day1_mean"])[:6]:
         print(f"  {c['name']:<11} day1={c['day1_mean']:>7.2f} ({c['day1_risk']:<8}) peak {c['peak_time_ist']}")
     p = r["plan"]
+    cf = r["counterfactual"]["cities"][:3]
+    print("  if stopped: " + ", ".join(f"{c['name']} -{c['reduction_pct']}%" for c in cf))
     print(f"  plan: {len(p['clusters'])} clusters, {p['fires_targeted']} fires -> "
           f"{p['exposure_avoided_pct_of_preventable']}% of preventable exposure "
           f"(naive biggest-fires: {p['naive_biggest_fires_pct_of_preventable']}%)")

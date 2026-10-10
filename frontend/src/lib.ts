@@ -1,4 +1,4 @@
-import type { Backtest, City, Forecast, Plan, Risk } from './types';
+import type { Backtest, City, Forecast, Plan, Risk, ToolCall } from './types';
 
 /** Smoke-index thresholds, kept in sync with RISK_BANDS in paralitrace/config.py. */
 export const RISK: [number, Risk][] = [[0, 'low'], [20, 'moderate'], [60, 'high'], [150, 'severe']];
@@ -47,5 +47,5 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
-    }).then(r => json<{ answer: string }>(r)),
+    }).then(r => json<{ answer: string; tools?: ToolCall[] }>(r)),
 };

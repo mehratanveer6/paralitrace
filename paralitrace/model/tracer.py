@@ -67,7 +67,10 @@ def _pad_snapshots(snapshots: list[dict], t0: float, horizon_h: int) -> None:
 
 
 def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
-             p: ModelParams = PARAMS, receptors=RECEPTORS) -> TraceResult:
+             p: ModelParams = PARAMS, receptors=RECEPTORS, stopped: set[int] | None = None) -> TraceResult:
+    """stopped: cluster indices whose projected (tomorrow's) burning is prevented. Their particles keep
+    moving with the same random draws but carry no mass, so the result is an exact counterfactual of
+    the run without `stopped`: same plumes elsewhere, same noise, only the prevented smoke removed."""
     rng = np.random.default_rng(p.seed)
     C, R, H = len(clusters), len(receptors), p.horizon_hours
     hours = t0 + 3600.0 * np.arange(H)
@@ -79,6 +82,8 @@ def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
         _pad_snapshots(snapshots, t0, H)
         return TraceResult(t0, hours, dose, by_src, by_src_proj, snapshots, clusters)
 
+    if stopped:
+        mass0 = np.where(proj & np.isin(src, list(stopped)), 0.0, mass0)
     lat = np.array([clusters[i].lat for i in src]) + rng.normal(0, 0.02, src.size)
     lon = np.array([clusters[i].lon for i in src]) + rng.normal(0, 0.02, src.size)
     mass = mass0.copy()
@@ -130,6 +135,7 @@ def simulate(clusters: list[FireCluster], wind: WindField, t0: float,
         if t >= t0 and t >= next_snap:
             a = np.flatnonzero(rel_t <= t)
             sel = a if a.size <= 1500 else rng.choice(a, 1500, replace=False)
+            sel = sel[mass[sel] > 0]          # prevented smoke isn't drawn (no-op without `stopped`)
             snapshots.append({
                 "t": int(next_snap),
                 "points": np.column_stack([lat[sel].round(3), lon[sel].round(3),

@@ -146,6 +146,22 @@ dialog.about p, dialog.about li { font-size: 15px; line-height: 1.55; max-width:
 dialog.about ul { padding-left: 20px; }
 dialog.about .close { position: absolute; top: 10px; right: 14px; border: 0; background: none; font-size: 32px; cursor: pointer; line-height: 1; }
 
+/* Strands tool-call trace */
+.trace { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 10px; }
+.trace-label { font-size: 12px; font-weight: 700; margin-right: 2px; }
+.trace code { font-family: var(--body); font-size: 12px; background: var(--ink); color: var(--paper-hi); padding: 2px 7px; }
+
+/* Before / after plan */
+.go.flip { background: var(--field); margin: 4px 0 8px; }
+.go.flip.on { background: var(--paper-hi); }
+ul.after { list-style: none; padding: 0; margin: 8px 0 14px; }
+ul.after li { display: grid; grid-template-columns: 1fr 54px auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--ink); }
+ul.after b { font-family: var(--display); font-size: 16px; }
+ul.after .pct { font-family: var(--display); font-weight: 800; font-size: 18px; }
+.after-banner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%) rotate(-1.5deg); z-index: 650;
+                background: var(--field); border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink);
+                font-family: var(--display); font-weight: 800; font-size: 22px; padding: 6px 16px; white-space: nowrap; }
+
 /* Map, printed */
 main { position: relative; min-width: 0; min-height: 0; }
 .map { position: absolute; inset: 0 0 88px 0; background: var(--paper); }
@@ -195,6 +211,7 @@ main { position: relative; min-width: 0; min-height: 0; }
   nav button { font-size: 16px; }
   .legend { font-size: 11px; padding: 4px 8px; top: 8px; right: 8px; box-shadow: 2px 2px 0 var(--ink); }
   .legend div:nth-child(3) { display: none; }
+  .after-banner { font-size: 15px; top: 54px; }
   dialog.about { padding: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }

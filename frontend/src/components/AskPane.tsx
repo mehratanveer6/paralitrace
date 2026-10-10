@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../lib';
 import { Markdown } from './Markdown';
+import type { ToolCall } from '../types';
 
 const EXAMPLES = [
   'Which cities get the worst smoke tomorrow, and why?',
@@ -8,7 +9,10 @@ const EXAMPLES = [
   'Where should Punjab send 200 machines tomorrow?',
 ];
 
-interface Turn { q: string; a?: string; error?: string }
+interface Turn { q: string; a?: string; tools?: ToolCall[]; error?: string }
+
+const args = (input: Record<string, unknown>) =>
+  Object.entries(input).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(', ');
 
 export function AskPane() {
   const [q, setQ] = useState('');
@@ -21,8 +25,8 @@ export function AskPane() {
     setBusy(true); setQ('');
     setTurns(t => [{ q: text }, ...t]);
     try {
-      const { answer } = await api.ask(text);
-      setTurns(t => [{ q: text, a: answer }, ...t.slice(1)]);
+      const { answer, tools } = await api.ask(text);
+      setTurns(t => [{ q: text, a: answer, tools }, ...t.slice(1)]);
     } catch (e) {
       setTurns(t => [{ q: text, error: (e as Error).message }, ...t.slice(1)]);
     }
@@ -45,6 +49,12 @@ export function AskPane() {
       {turns.map((t, i) => (
         <div className="turn" key={turns.length - i}>
           <p className="q">{t.q}</p>
+          {t.tools && t.tools.length > 0 && (
+            <div className="trace" aria-label="Tools the agent called">
+              <span className="trace-label">Strands agent called</span>
+              {t.tools.map((c, j) => <code key={j}>{c.name}({args(c.input)})</code>)}
+            </div>
+          )}
           {t.a != null && <div className="ans"><Markdown text={t.a} /></div>}
           {t.error && <div className="err">{t.error}</div>}
           {t.a == null && !t.error && <p className="note">Reading the forecast</p>}

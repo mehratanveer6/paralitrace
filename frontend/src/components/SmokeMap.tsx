@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import { INK, LEFT_LABEL, band, hourAt, plural } from '../lib';
-import type { City, Cluster, Forecast, Plan, Snapshot, Wind } from '../types';
+import type { City, Cluster, Counterfactual, Forecast, Plan, Snapshot, Wind } from '../types';
 
 /** Punjab, Haryana and Delhi NCR: the map opens fitted to this, whatever the screen size. */
 const REGION: L.LatLngBoundsExpression = [[28.3, 73.9], [32.0, 77.6]];
@@ -101,11 +101,14 @@ interface Props {
   frame: number;
   city: City | null;
   plan: Plan | null;
+  /** When set, draw the forecast with the plan's fires stopped. */
+  after: Counterfactual | null;
   onSelectCity: (id: string) => void;
 }
 
-export function SmokeMap({ data, frame, city, plan, onSelectCity }: Props) {
-  const snap = data.plumes[frame];
+export function SmokeMap({ data, frame, city, plan, after, onSelectCity }: Props) {
+  const snap = (after?.plumes[frame]) ?? data.plumes[frame];
+  const afterIndex = useMemo(() => new Map(after?.cities.map(c => [c.id, c.hourly_index]) ?? []), [after]);
   const h = hourAt(data, frame);
   // 95th percentile particle mass sets the halftone scale for the whole run
   const massRef = useMemo(() => {
@@ -116,16 +119,18 @@ export function SmokeMap({ data, frame, city, plan, onSelectCity }: Props) {
   return (
     <MapContainer className="map" bounds={REGION} boundsOptions={{ padding: [24, 24] }} zoomSnap={0.25} preferCanvas>
       <Panes />
-      {/* Standard OSM tiles need no key; the print filter in styles.css greys them out. */}
-      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution="&copy; OpenStreetMap contributors" maxZoom={12} />
+      {/* Esri's label-free grey canvas needs no key; the print filter in styles.css flattens it further. */}
+      <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution="Tiles &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors" maxZoom={12} />
       <WindLayer wind={data.wind} t={snap.t} />
       <SmokeLayer snap={snap} massRef={massRef} />
       <FiresLayer clusters={data.clusters} />
 
       {plan?.clusters.map(c => (
         <CircleMarker key={c.cluster_id} pane="plan" center={[c.lat, c.lon]} radius={11}
-          pathOptions={{ color: '#00a95c', weight: 4, fill: false }}>
+          pathOptions={after
+            ? { color: '#000', weight: 2, fill: true, fillColor: '#00a95c', fillOpacity: 1 }   // stopped: field is out
+            : { color: '#00a95c', weight: 4, fill: false }}>
           <Tooltip>{plural(c.fires, 'fire')}, {c.location}</Tooltip>
         </CircleMarker>
       ))}
@@ -139,7 +144,7 @@ export function SmokeMap({ data, frame, city, plan, onSelectCity }: Props) {
         const left = LEFT_LABEL.has(c.id);
         return (
           <CircleMarker key={c.id} pane="cities" center={[c.lat, c.lon]} radius={9}
-            pathOptions={{ color: '#000', weight: 3, fillOpacity: 1, fillColor: INK[band(c.hourly_index[h] ?? 0)] }}
+            pathOptions={{ color: '#000', weight: 3, fillOpacity: 1, fillColor: INK[band((afterIndex.get(c.id) ?? c.hourly_index)[h] ?? 0)] }}
             eventHandlers={{ click: () => onSelectCity(c.id) }}>
             <Tooltip permanent className="cl" direction={left ? 'left' : 'right'} offset={[left ? -10 : 10, 0]}>{c.name}</Tooltip>
           </CircleMarker>

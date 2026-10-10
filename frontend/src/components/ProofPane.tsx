@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib';
-import type { Backtest, BacktestDay } from '../types';
+import type { Backtest, BacktestDay, Heldout } from '../types';
 
 const W = 340, H = 150, ROWS = 22; // chart area + two tick rows for spikes
 
@@ -43,6 +43,34 @@ function SeasonChart({ days }: { days: BacktestDay[] }) {
   );
 }
 
+function HeldoutBlock({ h }: { h: Heldout }) {
+  const m = Object.fromEntries(h.methods.map(x => [x.key, x]));
+  const cal = m.calibrated, base = m.persistence;
+  return (
+    <>
+      <h3>Tested on days it never saw</h3>
+      <p className="note">Trained on {h.train}, scored only on {h.test}: {h.spike_days} spike days, {h.onset_days} of them the start of a smoky spell.</p>
+      <div className="vs">
+        <div className="win"><span className="big">{cal.caught}/{h.spike_days}</span>spike days caught by the calibrated forecast, {cal.onsets_caught} of {h.onset_days} spell starts</div>
+        <div className="lose"><span className="big">{base.caught}/{h.spike_days}</span>by repeating yesterday's reading, {base.onsets_caught} spell starts</div>
+      </div>
+      <table className="bt">
+        <thead><tr><th>Method</th><th>Caught</th><th>Starts</th><th>False alarms</th><th>Error</th></tr></thead>
+        <tbody>
+          {h.methods.map(x => (
+            <tr key={x.key} aria-selected={x.key === 'calibrated'}>
+              <td>{x.label}</td><td>{x.caught}</td><td>{x.onsets_caught}</td><td>{x.false_alarm_pct}%</td>
+              <td>{x.mae != null ? `${x.mae} µg/m³` : 'n/a'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="note">Error is the average miss in daily PM2.5. The calibrated forecast is a two-term regression on yesterday's
+        reading and the smoke model. The row without the smoke model shows what the physics adds.</p>
+    </>
+  );
+}
+
 export function ProofPane() {
   const [bt, setBt] = useState<Backtest | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -75,16 +103,23 @@ export function ProofPane() {
       <h3>Did past forecasts come true?</h3>
       <p className="note">{bt.season}, forecasts made {bt.lead_hours} hours ahead and checked against ground monitors. {bt.spike_definition}</p>
 
-      <div className="vs">
-        <div className="win"><span className="big">{s.spikes_caught}/{s.spike_days}</span>smoke spike days caught a day ahead ({s.hit_rate_pct}%)</div>
-        <div className="lose"><span className="big">{s.baseline_hit_rate_pct}%</span>caught by {s.baseline_label}</div>
-      </div>
-      {s.onset_days != null && s.onsets_caught != null && s.onset_days > 0 && (
-        <p className="note"><strong>{s.onsets_caught} of {s.onset_days}</strong> episode starts caught, the first smoky day
-          after a clear one. Repeating yesterday can never catch these.</p>
+      {bt.heldout && <HeldoutBlock h={bt.heldout} />}
+
+      <h3>The whole season, smoke model alone</h3>
+      {s.onset_days != null && s.onsets_caught != null && s.onset_days > 0 ? (
+        <div className="vs">
+          <div className="win"><span className="big">{s.onsets_caught}/{s.onset_days}</span>smoky spells seen coming a day ahead, from fires and wind alone</div>
+          <div className="lose"><span className="big">0/{s.onset_days}</span>by {s.baseline_label}, which can only follow a spell once it starts</div>
+        </div>
+      ) : (
+        <div className="vs">
+          <div className="win"><span className="big">{s.spikes_caught}/{s.spike_days}</span>smoke spike days caught a day ahead ({s.hit_rate_pct}%)</div>
+          <div className="lose"><span className="big">{s.baseline_hit_rate_pct}%</span>caught by {s.baseline_label}</div>
+        </div>
       )}
       <p className="note">
-        {s.false_alarm_pct}% of predicted spikes did not happen.
+        Across all {s.spike_days} spike days it caught {s.spikes_caught} ({s.hit_rate_pct}%), against {s.baseline_hit_rate_pct}% for {s.baseline_label}.
+        {' '}{s.false_alarm_pct}% of predicted spikes did not happen.
         {s.median_correlation != null && <> Median rank correlation with measured PM2.5: {s.median_correlation.toFixed(2)}.</>}
       </p>
 

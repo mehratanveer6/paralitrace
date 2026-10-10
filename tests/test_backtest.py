@@ -2,6 +2,7 @@
 from datetime import date, datetime, timedelta
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from paralitrace import backtest
@@ -100,6 +101,8 @@ def test_backtest_document_matches_the_proof_tab_contract(mocked):
     assert set(c["days"][0]) == {"date", "predicted_index", "observed_pm25", "observed_spike", "predicted_spike"}
     assert c["days"][5]["observed_pm25"] is None          # low-coverage day dropped
     assert (mocked / "backtest.json").exists()
+    h = doc["heldout"]
+    assert h and [x["key"] for x in h["methods"]] == ["persistence", "smoke_only", "calibrated_no_smoke", "calibrated"]
 
 
 def test_rerun_uses_the_cache(mocked, monkeypatch):
@@ -144,3 +147,22 @@ def test_replay_without_a_date_or_backtest_explains(tmp_path):
     from paralitrace import pipeline
     with pytest.raises(SystemExit, match="--date"):
         pipeline.smokiest_backtest_day(str(tmp_path))
+
+
+def test_heldout_calibration_uses_the_smoke_signal_when_it_is_real():
+    rng = np.random.default_rng(0)
+    rows = []
+    for city in range(8):
+        o_prev = 80.0
+        for k in range(61):
+            d = date(2025, 10, 1) + timedelta(k)
+            p = float(rng.gamma(1.5, 40))                     # tomorrow's forecast smoke
+            o = 40 + 0.4 * o_prev + 1.5 * p + rng.normal(0, 8)  # PM2.5 truly driven by the smoke
+            rows.append({"city": city, "date": d.isoformat(), "p": p, "o": o, "o_prev": o_prev,
+                         "o_thr": 190.0, "smoke_spike": p > 80})
+            o_prev = o
+    h = backtest.heldout(pd.DataFrame(rows), date(2025, 10, 1), date(2025, 11, 30))
+    m = {x["key"]: x for x in h["methods"]}
+    assert h["train"] == "Oct 2025" and h["test"] == "Nov 2025"
+    assert m["calibrated"]["mae"] < m["calibrated_no_smoke"]["mae"] < m["persistence"]["mae"]
+    assert m["calibrated"]["onsets_caught"] >= m["persistence"]["onsets_caught"] == 0

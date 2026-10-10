@@ -1,18 +1,17 @@
 # Demo video script (under 3:00)
 
-Record the app in a browser at 1920×1080. Keep the cursor slow. Speak over the screen.
+Record the app full screen in your browser (F11), at 1920×1080 if you can. Move the cursor slowly and
+pause a beat after each click. Your exact numbers are in `output/SUBMISSION.md`, section 3.
 
-| Time | Screen | Say |
+| Time | Do this | Say |
 |---|---|---|
-| 0:00–0:20 | Map playing the replayed day, plume drifting south-east | "Every autumn, stubble fires in Punjab and Haryana send smoke over millions of people. Satellites see every fire, but nobody tells a school principal when the smoke will arrive. This is [[replay date]], replayed with real NASA fire detections." |
-| 0:20–0:45 | Click a city in the list, its chart and source lines | "ParaliTrace follows the smoke. Every fire releases particles that ride the wind forecast for 48 hours. For Panipat it says when the smoke peaks, and exactly which districts it comes from." |
-| 0:45–1:15 | Plan tab, press Plan tomorrow, green rings appear | "Smoke already in the air can't be stopped, but tomorrow's fires can. With [[N]] field-team locations, the plan avoids [[X]]% of tomorrow's preventable exposure. Sending the same teams to the biggest fires manages [[Y]]%." |
-| 1:15–1:45 | Ask tab, the Punjabi school advisory | "Officials and principals can just ask. The assistant is built on the Strands Agents SDK, AWS's open-source agent framework, and only quotes numbers the model produced, here as a school advisory in Punjabi." |
-| 1:45–2:25 | Proof tab, summary, then one city's season chart | "Does it work? I replayed the 2025 season against ground monitors. It caught [[n]] of [[m]] smoke-spike days a day ahead, and [[k]] episode starts, which simply repeating yesterday can never catch." |
-| 2:25–2:50 | `paralitrace/agent.py` in your editor (the `from strands import Agent, tool` line and the `@tool` functions), then the How it works dialog | "Under the hood, the Strands Agents SDK runs the agent loop and its five forecast tools. Everything uses public NASA and open weather data, and the code is open." |
-| 2:50–3:00 | Click **Fetch live fires**, today's map loads | "And it runs live: this is today's fires, refreshed from NASA in seconds. ParaliTrace. Follow the smoke, stop the right fires." |
+| 0:00–0:20 | App open on the replayed day (orange Replay sticker). Press ▶ on the timeline and let the smoke drift. | "Every autumn, stubble fires in Punjab and Haryana send smoke over millions of people. Satellites see every fire, but nobody tells a school principal when the smoke will arrive. This is [replay date], replayed with real NASA fire detections." |
+| 0:20–0:45 | Pause. In Cities, click the top city. Its chart and dotted source lines appear. | "ParaliTrace follows the smoke. Every fire releases particles that ride the wind for 48 hours. For this city it shows when the smoke peaks, and exactly which districts it comes from." |
+| 0:45–1:20 | Plan tab → **Plan tomorrow**. Green rings appear. Then click **Show the smoke if these fires are stopped**. | "Smoke already in the air can't be stopped, but tomorrow's fires can. With [N] field-team locations, the plan avoids [X]% of tomorrow's preventable exposure; the biggest-fires approach manages [Y]%. And here's the same forecast with those fires stopped." Then read the top two cities from the list. |
+| 1:20–1:50 | Ask tab → click **Write a school advisory for Ludhiana in Punjabi.** Wait for the answer, then point at the black tool-call chips. | "Officials can just ask. The assistant is a Strands Agents SDK agent, AWS's open-source agent framework. You can see every tool it calls on the forecast, so it only quotes real numbers, here as a school advisory in Punjabi." |
+| 1:50–2:30 | Proof tab. Rest on the top comparison, then scroll to the city chart. | "Does it work? I replayed the 2025 season against ground monitors, trained on October and tested on November." Then read the Proof line from SUBMISSION.md. |
+| 2:30–2:50 | Open `paralitrace/agent.py` in your editor: the `from strands import Agent, tool` line, then one `@tool` function. | "Under the hood, Strands runs the agent loop and turns these five Python functions into tools the model can call." |
+| 2:50–3:00 | Back in the app, click **Fetch live fires**; today's map loads. | "And it runs live on today's fires. ParaliTrace: follow the smoke, stop the right fires." |
 
-Your exact numbers for the [[...]] blanks are in `output/SUBMISSION.md` after the runs.
-
-Before recording: the app should open on the replayed day (orange Replay sticker), close other tabs, and check the
-YouTube link opens in a signed-out browser after upload.
+Record with the Windows Game Bar (Win + Alt + R starts and stops; files land in Videos\Captures) or OBS.
+Upload to YouTube as **Unlisted**, then open the link in a private window to check it plays.
