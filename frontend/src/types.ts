@@ -169,6 +169,15 @@ export interface Counterfactual {
   cities: CounterfactualCity[];
 }
 
+/** Per-cluster planner inputs, so the hosted demo can re-plan in the browser. */
+export interface PlanInputs {
+  total_harm: number;
+  clusters: {
+    id: string; harm: number; cost: number; frp: number;
+    lat?: number; lon?: number; fires?: number; frp_mw?: number; location?: string; protects?: string[];
+  }[];
+}
+
 export interface ToolCall { name: string; input: Record<string, unknown> }
 
 export interface Forecast {
@@ -177,6 +186,7 @@ export interface Forecast {
   cities: City[];
   plan: Plan;
   counterfactual?: Counterfactual;
+  plan_inputs?: PlanInputs;
   plumes: Snapshot[];
   wind: Wind;
 }

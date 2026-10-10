@@ -1,0 +1,8 @@
+# The hosted demo is the static frontend only; keep the Python app out of the Vercel build.
+app.py
+requirements.txt
+paralitrace/
+tests/
+deploy/
+docs/
+output/

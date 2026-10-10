@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, fmt, hourAt } from '../lib';
+import { api, fmt, hourAt, isHosted } from '../lib';
 import type { Forecast } from '../types';
 
 interface Props { data: Forecast; frame: number; onRefreshed: () => Promise<void> }
@@ -34,9 +34,11 @@ export function Clock({ data, frame, onRefreshed }: Props) {
         {mode === 'live' && <span className="live">Live satellite fires</span>}
         {mode === 'replay' && <span className="replay">Replay: real fires, {replayDay}</span>}
         {mode === 'synthetic' && <span className="demo">Demo data, not real fires</span>}
-        <button className="link" onClick={fetchLive} disabled={busy}>
-          {busy ? 'Fetching fires and winds' : live ? 'Refresh' : 'Fetch live fires'}
-        </button>
+        {isHosted()
+          ? <span className="note">Hosted demo snapshot</span>
+          : <button className="link" onClick={fetchLive} disabled={busy}>
+              {busy ? 'Fetching fires and winds' : live ? 'Refresh' : 'Fetch live fires'}
+            </button>}
       </div>
       <div className="note">Forecast issued {issued} IST</div>
       {error && <div className="err">{error}</div>}

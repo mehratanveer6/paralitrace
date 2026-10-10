@@ -97,3 +97,21 @@ def test_report_fills_numbers_and_never_invents_missing_ones():
     empty = build(None, None)
     assert "Not run yet" in empty and "Run the pipeline" in empty
     assert "demo data" in build({**latest, "meta": {"mode": "synthetic"}}, None)
+
+
+def test_demo_export_and_examples_match_the_ui(tmp_path, monkeypatch):
+    import json, os, re
+    from paralitrace import export_demo
+    tsx = open(os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "components", "AskPane.tsx"), encoding="utf-8").read()
+    ui = re.findall(r"^  '(.+)',$", tsx[tsx.index("const EXAMPLES"):tsx.index("];")], re.M)
+    assert ui == export_demo.EXAMPLES
+
+    out = tmp_path / "output"; out.mkdir()
+    (out / "latest.json").write_text('{"meta": {}}'); (out / "backtest.json").write_text("{}")
+    monkeypatch.setattr(export_demo, "OUTPUT_DIR", str(out))
+    monkeypatch.setattr(agent, "ask_with_trace", lambda q: ("answer to " + q, [{"name": "run_info", "input": {}}]))
+    demo = tmp_path / "demo"
+    files = export_demo.export(out_dir=str(demo))
+    assert files == ["latest.json", "backtest.json", "answers.json"]
+    rec = json.loads((demo / "answers.json").read_text(encoding="utf-8"))
+    assert [r["question"] for r in rec] == export_demo.EXAMPLES and rec[0]["tools"][0]["name"] == "run_info"

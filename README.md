@@ -74,6 +74,14 @@ http://127.0.0.1:5173. Vite hot-reloads and forwards `/api` to the backend.
 - **Proof**: backtest results against ground monitors.
 - **Fetch live fires** reruns the pipeline on real data from the browser.
 
+### Hosted demo
+
+`py -m paralitrace.export_demo` packs the forecast on screen, the backtest and recorded assistant answers
+into `frontend/public/demo/`. Without a Python server (for example on Vercel, configured by `vercel.json`)
+the app detects this, reads the snapshot, re-plans in the browser (`frontend/src/planner.ts`, a tested
+mirror of the Python planner) and shows the recorded answers. Live refresh and free-form questions need
+the full app.
+
 ### Backtest output
 
 The Proof tab reads `output/backtest.json` through `/api/backtest`. The schema is the `Backtest`

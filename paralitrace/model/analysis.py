@@ -107,7 +107,7 @@ def plan_interventions(tr: TraceResult, budget_fires: int = 150) -> dict:
     total_harm = float((pop @ tr.dose_by_src).sum())  # everything in the forecast window
     preventable = float(harm.sum())
     cost = np.array([max(c.n_fires, 1) for c in tr.clusters], dtype=float)
-    order = np.argsort(-(harm / cost))
+    order = np.argsort(-(harm / cost), kind="stable")
 
     chosen, spent, gained = [], 0, 0.0
     for c in order:
@@ -128,7 +128,7 @@ def plan_interventions(tr: TraceResult, budget_fires: int = 150) -> dict:
 
     # Naive baseline: stop the biggest fires (by FRP) with the same budget.
     naive, spent_n = 0.0, 0
-    for c in np.argsort([-cl.frp_mw for cl in tr.clusters]):
+    for c in np.argsort([-cl.frp_mw for cl in tr.clusters], kind="stable"):
         if spent_n + cost[c] > budget_fires:
             continue
         spent_n += int(cost[c]); naive += float(harm[c])
@@ -142,6 +142,23 @@ def plan_interventions(tr: TraceResult, budget_fires: int = 150) -> dict:
         "naive_biggest_fires_pct_of_preventable": round(100 * naive / preventable, 1) if preventable else 0,
         "note": "Benefit counts only tomorrow's projected burning; smoke already emitted cannot be prevented.",
     }
+
+
+def plan_inputs(tr: TraceResult) -> dict:
+    """Everything plan_interventions needs, per cluster, so a browser can re-plan for any budget.
+    The hosted demo (no Python server) uses this; frontend/src/planner.ts mirrors plan_interventions."""
+    pop = np.array([r.population for r in RECEPTORS], dtype=float)
+    harm = pop @ tr.dose_by_src_projected
+    rows = []
+    for c, cl in enumerate(tr.clusters):
+        row = {"id": cl.id, "harm": float(harm[c]), "cost": max(cl.n_fires, 1), "frp": float(cl.frp_mw)}
+        if harm[c] > 0:
+            top_r = np.argsort(-(pop * tr.dose_by_src_projected[:, c]))[:3]
+            row.update(lat=round(cl.lat, 3), lon=round(cl.lon, 3), fires=cl.n_fires, frp_mw=round(cl.frp_mw, 1),
+                       location=describe(cl.lat, cl.lon),
+                       protects=[RECEPTORS[i].name for i in top_r if tr.dose_by_src_projected[i, c] > 0])
+        rows.append(row)
+    return {"total_harm": float((pop @ tr.dose_by_src).sum()), "clusters": rows}
 
 
 def _km(lat1, lon1, lat2, lon2) -> float:

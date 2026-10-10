@@ -20,7 +20,7 @@ from .data import fires as fires_mod
 from .data import winds as winds_mod
 from .data.fires import FireCluster
 from .data.synthetic import synthetic_fires, synthetic_winds
-from .model.analysis import auto_budget, city_forecasts, plan_interventions, risk_band
+from .model.analysis import auto_budget, city_forecasts, plan_inputs, plan_interventions, risk_band
 from .model.tracer import TraceResult, simulate
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -69,6 +69,7 @@ def run(mode: str = "synthetic", budget_fires: int | None = None, out_dir: str =
         "cities": city_forecasts(trace),
         "plan": plan,
         "counterfactual": counterfactual(clusters, wind, t0, trace, plan),
+        "plan_inputs": plan_inputs(trace),
         "plumes": trace.snapshots,
         "wind": wind.to_json(every=3),
     }

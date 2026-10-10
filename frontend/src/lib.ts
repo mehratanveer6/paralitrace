@@ -1,4 +1,5 @@
 import type { Backtest, City, Forecast, Plan, Risk, ToolCall } from './types';
+import { planLocal } from './planner';
 
 /** Smoke-index thresholds, kept in sync with RISK_BANDS in paralitrace/config.py. */
 export const RISK: [number, Risk][] = [[0, 'low'], [20, 'moderate'], [60, 'high'], [150, 'severe']];
@@ -31,21 +32,63 @@ async function json<T>(r: Response): Promise<T> {
   return body as T;
 }
 
+/* Two ways to run:
+ * - Local / server: FastAPI answers /api/*.
+ * - Hosted demo (e.g. Vercel): no Python server, so the app reads a snapshot from /demo/*.json,
+ *   re-plans in the browser and shows recorded answers. Detected at load: /api/latest doesn't return JSON.
+ */
+let hosted = false;
+let snapshot: Forecast | null = null;
+export const isHosted = () => hosted;
+
+async function maybeJson(url: string): Promise<unknown | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+interface Recorded { question: string; answer: string; tools: ToolCall[] }
+
 export const api = {
-  latest: () => fetch('/api/latest').then(r => json<Forecast>(r)),
-  /** Resolves to null when no backtest has been run yet (404). */
-  backtest: () => fetch('/api/backtest').then(r => (r.status === 404 ? null : json<Backtest>(r))),
-  run: (mode: 'live' | 'synthetic') =>
-    fetch('/api/run', {
+  latest: async (): Promise<Forecast> => {
+    const live = await maybeJson('/api/latest');
+    if (live) { hosted = false; return live as Forecast; }
+    const snap = await maybeJson('/demo/latest.json');
+    if (!snap) throw new Error('No forecast available');
+    hosted = true; snapshot = snap as Forecast;
+    return snapshot;
+  },
+  /** Resolves to null when no backtest has been run yet. */
+  backtest: async (): Promise<Backtest | null> => {
+    if (hosted) return (await maybeJson('/demo/backtest.json')) as Backtest | null;
+    return fetch('/api/backtest').then(r => (r.status === 404 ? null : json<Backtest>(r)));
+  },
+  run: (mode: 'live' | 'synthetic') => {
+    if (hosted) return Promise.reject(new Error('Live refresh runs on the full app; this hosted demo shows a fixed snapshot.'));
+    return fetch('/api/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode }),
-    }).then(r => json<unknown>(r)),
-  plan: (budget: number) => fetch(`/api/plan?budget=${budget}`).then(r => json<Plan>(r)),
-  ask: (question: string) =>
-    fetch('/api/ask', {
+    }).then(r => json<unknown>(r));
+  },
+  plan: async (budget: number): Promise<Plan> => {
+    if (hosted && snapshot?.plan_inputs) return planLocal(snapshot.plan_inputs, budget);
+    return fetch(`/api/plan?budget=${budget}`).then(r => json<Plan>(r));
+  },
+  ask: async (question: string): Promise<{ answer: string; tools?: ToolCall[]; recorded?: boolean }> => {
+    if (hosted) {
+      const rec = ((await maybeJson('/demo/answers.json')) as Recorded[] | null) ?? [];
+      const hit = rec.find(r => r.question.trim().toLowerCase() === question.trim().toLowerCase());
+      if (hit) return { answer: hit.answer, tools: hit.tools, recorded: true };
+      throw new Error('In this hosted demo the assistant shows recorded answers to the three example questions. '
+        + 'Free-form questions need the full app, which calls the model with a private key.');
+    }
+    return fetch('/api/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
-    }).then(r => json<{ answer: string; tools?: ToolCall[] }>(r)),
+    }).then(r => json<{ answer: string; tools?: ToolCall[] }>(r));
+  },
 };
