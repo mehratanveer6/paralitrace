@@ -40,6 +40,7 @@ export function AskPane() {
       </div>
       <button className="go" onClick={() => ask(q)} disabled={busy || !q.trim()}>Ask</button>
       <span className="note hint">Ctrl + Enter also asks</span>
+      <p className="note built">Built with the Strands Agents SDK (AWS open source). Answers come only from the forecast's own numbers.</p>
 
       {turns.map((t, i) => (
         <div className="turn" key={turns.length - i}>

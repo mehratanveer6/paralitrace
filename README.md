@@ -81,20 +81,15 @@ interface in `frontend/src/types.ts`: a season summary (spike days caught a day 
 rank correlation, and a naive baseline to compare against) plus per-city daily rows of forecast
 index against measured PM2.5. Until that file exists the tab explains what it will show.
 
-The assistant tab needs a model. Pick one with `PT_MODEL`:
-
-| `PT_MODEL` | Needs |
-|---|---|
-| `bedrock` (default) | AWS credentials with Bedrock model access, `AWS_REGION` |
-| `ollama` | a local Ollama with a tool-calling model, `OLLAMA_MODEL` |
-| `anthropic` | `ANTHROPIC_API_KEY` and `pip install 'strands-agents[anthropic]'` |
+Keys go in `.env` (copy `.env.example`). The assistant needs `GEMINI_API_KEY` (free at aistudio.google.com/apikey),
+or any provider listed in `paralitrace/agent.py`. `py -m paralitrace.report` writes `output/SUBMISSION.md`,
+the writeup with the numbers from the latest runs.
 
 ## AWS
 
-- **Strands Agents SDK** (AWS open source) powers the assistant.
-- **Amazon Bedrock** is the default model provider.
-- **Amazon EC2** serves the app and refreshes live data hourly. See `deploy/README.md`:
-  one launch script, no SSH needed.
+- **Strands Agents SDK** (AWS open source) powers the assistant: agent loop, tool calling and the five
+  forecast tools. The model is pluggable: Gemini by default (free key), Amazon Bedrock, Anthropic or Ollama.
+- **Amazon EC2**: `deploy/` has a one-paste launch script that serves the app and refreshes live data hourly.
 
 ## Honest limitations
 

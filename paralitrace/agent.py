@@ -1,16 +1,19 @@
 """Strands agent that answers questions and drafts advisories from the model's output.
 
-The agent never invents numbers: every figure comes from a tool that reads the
-latest pipeline run. Model provider is chosen with PT_MODEL:
-  bedrock (default)  AWS Bedrock, uses your AWS credentials and AWS_REGION
-  ollama             local model, set OLLAMA_HOST and OLLAMA_MODEL (needs a tool-calling model)
-  anthropic          ANTHROPIC_API_KEY, needs `pip install 'strands-agents[anthropic]'`
+Built on the Strands Agents SDK (AWS open source). The agent never invents numbers: every
+figure comes from a tool that reads the latest pipeline run.
+
+The model behind it is picked from what is configured, in this order (PT_MODEL forces one):
+  gemini     GEMINI_API_KEY, free at aistudio.google.com/apikey. GEMINI_MODEL picks the model,
+             otherwise the first of GEMINI_MODELS that the key can use.
+  anthropic  ANTHROPIC_API_KEY, needs `pip install 'strands-agents[anthropic]'`
+  ollama     a local Ollama: OLLAMA_HOST, OLLAMA_MODEL (needs a tool-calling model)
+  bedrock    Amazon Bedrock with your AWS credentials and AWS_REGION
 """
 from __future__ import annotations
 
 import json
 import os
-from functools import lru_cache
 
 from strands import Agent, tool
 
@@ -114,32 +117,73 @@ def intervention_plan(budget_fires: int = 150) -> dict:
 TOOLS = [run_info, list_city_risks, city_forecast, smoke_sources, intervention_plan]
 
 
-def _model():
-    provider = (env("PT_MODEL", "bedrock") or "bedrock").lower()
-    if provider == "ollama":
-        from strands.models.ollama import OllamaModel
-        return OllamaModel(env("OLLAMA_HOST", "http://localhost:11434"),
-                           model_id=env("OLLAMA_MODEL", "qwen2.5:7b"))
-    if provider == "anthropic":
+GEMINI_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash")
+
+
+class NoModelConfigured(RuntimeError):
+    pass
+
+
+def provider() -> str:
+    forced = (env("PT_MODEL") or "").lower()
+    if forced:
+        return forced
+    if env("GEMINI_API_KEY"):
+        return "gemini"
+    if env("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if env("OLLAMA_MODEL"):
+        return "ollama"
+    if env("AWS_ACCESS_KEY_ID") or env("AWS_PROFILE"):
+        return "bedrock"
+    raise NoModelConfigured("The assistant needs a model. Get a free Gemini key at aistudio.google.com/apikey, "
+                            "put it in .env as GEMINI_API_KEY, and restart the server.")
+
+
+def candidates() -> list:
+    """Model objects to try in order. Only Gemini has fallbacks, for model IDs a key can't use."""
+    p = provider()
+    if p == "gemini":
+        from strands.models.gemini import GeminiModel
+        ids = [env("GEMINI_MODEL")] if env("GEMINI_MODEL") else list(GEMINI_MODELS)
+        return [GeminiModel(client_args={"api_key": env("GEMINI_API_KEY")}, model_id=m,
+                            params={"temperature": 0.3}) for m in ids]
+    if p == "anthropic":
         from strands.models.anthropic import AnthropicModel
-        return AnthropicModel(model_id=env("ANTHROPIC_MODEL", "claude-sonnet-4-6"), max_tokens=1500)
+        return [AnthropicModel(model_id=env("ANTHROPIC_MODEL", "claude-sonnet-4-6"), max_tokens=1500)]
+    if p == "ollama":
+        from strands.models.ollama import OllamaModel
+        return [OllamaModel(env("OLLAMA_HOST", "http://localhost:11434"), model_id=env("OLLAMA_MODEL", "qwen2.5:7b"))]
     from strands.models.bedrock import BedrockModel
     kwargs = {"region_name": env("AWS_REGION", "us-east-1")}
     if env("BEDROCK_MODEL_ID"):
         kwargs["model_id"] = env("BEDROCK_MODEL_ID")
-    return BedrockModel(**kwargs)
+    return [BedrockModel(**kwargs)]
 
 
-@lru_cache(maxsize=1)
-def _model_cached():
-    return _model()
+_working: list = []   # the model that last answered, reused for later questions
+
+
+def _model_unavailable(e: Exception) -> bool:
+    msg = str(e).lower()
+    return any(k in msg for k in ("not found", "404", "not supported", "permission", "403", "quota", "429"))
 
 
 def ask(question: str) -> str:
     """Fresh agent per question so conversations don't leak between users."""
-    agent = Agent(model=_model_cached(), tools=TOOLS, system_prompt=SYSTEM_PROMPT,
-                  callback_handler=None)
-    return str(agent(question)).strip()
+    models = _working or candidates()
+    last: Exception | None = None
+    for m in models:
+        try:
+            agent = Agent(model=m, tools=TOOLS, system_prompt=SYSTEM_PROMPT, callback_handler=None)
+            answer = str(agent(question)).strip()
+            _working[:] = [m]
+            return answer
+        except Exception as e:
+            last = e
+            if not _model_unavailable(e):
+                raise
+    raise RuntimeError(f"No configured model could answer: {last}")
 
 
 if __name__ == "__main__":

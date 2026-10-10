@@ -80,5 +80,26 @@ RISK_BANDS = [(0.0, "low"), (20.0, "moderate"), (60.0, "high"), (150.0, "severe"
 OUTPUT_DIR = os.environ.get("PT_OUTPUT_DIR", os.path.join(os.path.dirname(__file__), "..", "output"))
 
 
+ENV_FILE = os.path.join(os.path.dirname(__file__), "..", ".env")
+
+
+def load_env_file(path: str = ENV_FILE) -> None:
+    """KEY=VALUE lines from .env into the environment. Real environment variables win; blanks are skipped."""
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8-sig") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.split(" #")[0].strip().strip('"').strip("'")
+            if k and v and k not in os.environ:
+                os.environ[k] = v
+
+
+load_env_file()
+
+
 def env(key: str, default: str | None = None) -> str | None:
-    return os.environ.get(key, default)
+    return os.environ.get(key) or default

@@ -72,9 +72,11 @@ def backtest():
 @app.post("/api/ask")
 def ask(req: AskRequest):
     _latest()
+    from paralitrace.agent import NoModelConfigured, ask as agent_ask
     try:
-        from paralitrace.agent import ask as agent_ask
         return {"answer": agent_ask(req.question)}
+    except NoModelConfigured as e:
+        raise HTTPException(503, str(e))
     except Exception as e:
         raise HTTPException(503, f"The assistant is unavailable: {type(e).__name__}: {e}")
 

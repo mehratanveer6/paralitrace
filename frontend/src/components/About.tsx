@@ -25,8 +25,9 @@ export function About() {
           field teams can cover, and compares that against sending teams to the biggest fires.</p>
 
         <h3>Explain it</h3>
-        <p>An assistant built with the Strands Agents SDK on Amazon Bedrock answers questions and writes school advisories
-          in English, Hindi or Punjabi. It can only quote numbers the model produced.</p>
+        <p>An assistant built with the Strands Agents SDK, AWS's open-source agent framework, answers questions and writes
+          school advisories in English, Hindi or Punjabi. It reaches the forecast only through five tools, so it can only
+          quote numbers the model produced.</p>
 
         <h3>Limits</h3>
         <ul>

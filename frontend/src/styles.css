@@ -126,6 +126,7 @@ table.bt tr { cursor: pointer; }
 table.bt tr[aria-selected="true"] td { font-weight: 700; background: var(--paper-hi); }
 
 .hint { margin-left: 12px; }
+.built { margin-top: 10px; border-left: 3px solid var(--ink); padding-left: 8px; }
 .turn { margin-top: 22px; }
 .turn .q { font-family: var(--display); font-weight: 700; font-size: 17px; margin: 0 0 4px; }
 .md p { margin: 0 0 8px; } .md p:last-child { margin-bottom: 0; }
