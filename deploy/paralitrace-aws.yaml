@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  ParaliTrace on AWS: one EC2 instance serving the live app on port 80, refreshing NASA fires hourly,
+  with the assistant on Amazon Bedrock (Amazon Nova) through an IAM role.
+
+Parameters:
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Optional. Fallback for the assistant if Bedrock is unavailable on this account.
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small]
+    Description: t3.micro is free tier eligible.
+  UbuntuAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: Latest Ubuntu 24.04 image, looked up automatically.
+
+Resources:
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ParaliTrace web traffic
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  AppInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref UbuntuAmi
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!GetAtt WebSecurityGroup.GroupId]
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs: { VolumeSize: 16, VolumeType: gp3 }
+      Tags:
+        - Key: Name
+          Value: paralitrace
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          export GEMINI_API_KEY='${GeminiApiKey}'
+          curl -fsSL https://raw.githubusercontent.com/mehratanveer6/paralitrace/main/deploy/ec2-user-data.sh -o /root/paralitrace-setup.sh
+          bash /root/paralitrace-setup.sh
+
+Outputs:
+  AppUrl:
+    Description: Open this about 10 minutes after the stack finishes (http, not https).
+    Value: !Sub "http://${AppInstance.PublicIp}"

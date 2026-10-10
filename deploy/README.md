@@ -1,5 +1,9 @@
 # Deploying ParaliTrace on AWS
 
+**Fastest:** CloudFormation, **Create stack → Upload a template file → `paralitrace-aws.yaml`**, optionally paste a
+Gemini key as fallback, tick the IAM acknowledgement, Submit. The **Outputs** tab shows the app URL; it is ready about
+10 minutes after the stack completes. The manual steps below do the same by hand.
+
 One Amazon EC2 instance serves the app, refreshes live NASA fires every hour, and calls Amazon Bedrock
 (Amazon Nova) for the assistant through its IAM role. Everything installs from `ec2-user-data.sh`;
 there is nothing to SSH in and run.

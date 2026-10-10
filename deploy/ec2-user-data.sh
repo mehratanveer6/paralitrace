@@ -5,9 +5,9 @@
 # The assistant runs on Amazon Bedrock (Amazon Nova) through the instance's IAM role.
 # Progress log on the instance: /var/log/cloud-init-output.log
 
-# ---- optional: paste keys between the quotes ----------------------------------------
-GEMINI_API_KEY=""   # fallback for the assistant if Bedrock is unavailable on the account
-FIRMS_MAP_KEY=""    # NASA FIRMS key; without it live fires come from NASA's public files
+# ---- optional keys: paste between the quotes, or pass them in as environment variables ----
+GEMINI_API_KEY="${GEMINI_API_KEY:-}"   # fallback for the assistant if Bedrock is unavailable on the account
+FIRMS_MAP_KEY="${FIRMS_MAP_KEY:-}"     # NASA FIRMS key; without it live fires come from NASA's public files
 # ----------------------------------------------------------------------------------
 
 set -euxo pipefail
