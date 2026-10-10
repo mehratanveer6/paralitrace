@@ -14,6 +14,7 @@ import os
 from .config import OUTPUT_DIR
 
 REPO = "https://github.com/mehratanveer6/paralitrace"
+DEMO = "https://paralitrace.vercel.app"
 
 
 def _load(name: str) -> dict | None:
@@ -90,6 +91,7 @@ a ready Amazon EC2 deployment (deploy/ec2-user-data.sh: installs the app, runs i
 live NASA fires every hour) and Amazon Bedrock support through Strands, so moving onto AWS services is a
 deployment step, not a rewrite.
 
+Live demo: {DEMO}
 Code: {REPO}"""
 
 
@@ -119,6 +121,7 @@ def build(latest: dict | None, bt: dict | None) -> str:
     writeup = f"""# ParaliTrace: follow the stubble smoke, stop the right fires
 
 **Track:** Air
+**Live demo:** {DEMO}
 **Repository:** {REPO}
 
 ## The problem
