@@ -110,4 +110,4 @@ the writeup with the numbers from the latest runs.
 
 ## Built with
 
-Python, NumPy, FastAPI, Strands Agents SDK. Frontend: React 19, TypeScript, Vite, react-leaflet. AI coding assistant: Claude (Anthropic).
+Python, NumPy, FastAPI, Strands Agents SDK. Frontend: React 19, TypeScript, Vite, react-leaflet.

@@ -3,7 +3,7 @@
 One EC2 instance serves the app, runs the hourly live pipeline and calls Bedrock for the
 assistant. Everything installs from `ec2-user-data.sh`; there is nothing to SSH in and run.
 
-## 1. Allow Bedrock to use Claude (once)
+## 1. Enable model access in Bedrock (once)
 
 1. AWS console, region **US East (N. Virginia) us-east-1** (top right).
 2. Open **Amazon Bedrock** and find **Model access**. If Anthropic models ask for a use-case form,

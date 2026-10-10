@@ -7,7 +7,7 @@ set -euxo pipefail
 
 REPO=https://github.com/mehratanveer6/paralitrace.git
 APP=/opt/paralitrace
-REGION=us-east-1          # where Bedrock runs; must match the region you enabled Claude in
+REGION=us-east-1          # where Bedrock runs; must match the region where you enabled model access
 
 # 1 GB of swap so the frontend build fits on a 1 GB instance
 fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
