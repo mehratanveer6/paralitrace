@@ -84,6 +84,16 @@ def city_forecasts(tr: TraceResult, top_n: int = 5) -> list[dict]:
     return out
 
 
+def auto_budget(tr: TraceResult, share: float = 0.25) -> int:
+    """A budget that is a real constraint: a quarter of the fires whose smoke reaches a covered city.
+
+    A fixed budget can exceed every fire that matters on a quiet day, which makes any plan look perfect.
+    """
+    reaching = tr.dose_by_src_projected.sum(axis=0) > 0
+    fires = sum(c.n_fires for c, r in zip(tr.clusters, reaching) if r)
+    return max(5, int(round(share * fires))) if fires else 10
+
+
 def plan_interventions(tr: TraceResult, budget_fires: int = 150) -> dict:
     """Greedy knapsack: which clusters to stop burning tomorrow to cut the most
     population-weighted smoke exposure, given a budget counted in fire detections

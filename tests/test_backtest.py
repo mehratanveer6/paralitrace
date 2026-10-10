@@ -119,3 +119,28 @@ def test_missing_keys_explained(monkeypatch):
 def test_spearman():
     assert backtest.spearman(list(range(10)), [x * x for x in range(10)]) == pytest.approx(1.0)
     assert backtest.spearman([1, 2], [3, 4]) is None
+
+
+def test_replay_of_the_smokiest_backtest_day(mocked):
+    from paralitrace import pipeline
+    backtest.run(START, END)
+    day = pipeline.smokiest_backtest_day(str(mocked))
+    assert START <= day <= END
+    r = pipeline.run("replay", out_dir=str(mocked))
+    m = r["meta"]
+    assert m["mode"] == "replay" and m["replay_date"] == day
+    assert m["data_label"].startswith("Replay of ")
+    assert m["fire_detections"] > 0 and len(r["plumes"]) == 16
+    # forecast issued 18:00 IST the evening before the replayed day
+    from datetime import datetime
+    issued = datetime.fromtimestamp(m["forecast_start_epoch"], pipeline.IST)
+    assert issued.hour == 18 and issued.strftime("%Y-%m-%d") < day
+    # the plan budget is a real constraint, not everything that matters
+    p = r["plan"]
+    assert p["exposure_avoided_pct_of_preventable"] < 100
+
+
+def test_replay_without_a_date_or_backtest_explains(tmp_path):
+    from paralitrace import pipeline
+    with pytest.raises(SystemExit, match="--date"):
+        pipeline.smokiest_backtest_day(str(tmp_path))

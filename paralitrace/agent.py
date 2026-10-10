@@ -18,7 +18,7 @@ import os
 from strands import Agent, tool
 
 from .config import OUTPUT_DIR, RECEPTORS, env
-from .model.analysis import plan_interventions
+from .model.analysis import auto_budget, plan_interventions
 
 SYSTEM_PROMPT = """You are ParaliTrace, an air-quality analyst for Punjab, Haryana and Delhi during
 the crop-residue burning season. You help district officials, school principals and residents.
@@ -26,7 +26,8 @@ the crop-residue burning season. You help district officials, school principals 
 Rules:
 - Use the tools for every number. Never invent figures, places or times.
 - Call run_info first in a conversation. If the data label says SYNTHETIC, say plainly
-  that the numbers come from demo data, not real observations.
+  that the numbers come from demo data, not real observations. If it says Replay, the
+  forecast is a real past day: give its date and speak about it in the past tense.
 - The smoke index is relative and not yet calibrated to PM2.5. Describe it with the
   risk band (low, moderate, high, severe) and the timing, not as a concentration.
 - Smoke already emitted cannot be prevented. Only tomorrow's projected burning can.
@@ -101,15 +102,17 @@ def smoke_sources(city: str) -> dict:
 
 
 @tool
-def intervention_plan(budget_fires: int = 150) -> dict:
+def intervention_plan(budget_fires: int = 0) -> dict:
     """Best fire clusters to stop burning tomorrow to protect the most people, given how many
     fire locations field teams or crop-residue machines can cover.
 
     Args:
-        budget_fires: Number of fire detections the state can act on tomorrow.
+        budget_fires: Number of fire locations teams can act on tomorrow. 0 sizes it to the day.
     """
     from .pipeline import load_trace
-    plan = plan_interventions(load_trace(), budget_fires=max(1, int(budget_fires)))
+    trace = load_trace()
+    budget = int(budget_fires) if budget_fires and int(budget_fires) > 0 else auto_budget(trace)
+    plan = plan_interventions(trace, budget_fires=budget)
     plan["clusters"] = plan["clusters"][:12]
     return plan
 

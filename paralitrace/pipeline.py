@@ -2,6 +2,8 @@
 
     python -m paralitrace.pipeline --mode synthetic
     python -m paralitrace.pipeline --mode live          # real fires; FIRMS_MAP_KEY optional
+    python -m paralitrace.pipeline --mode replay        # a real past day, by default the smokiest day
+                                                        # of the last backtest (needs FIRMS_MAP_KEY)
 """
 from __future__ import annotations
 
@@ -18,17 +20,24 @@ from .data import fires as fires_mod
 from .data import winds as winds_mod
 from .data.fires import FireCluster
 from .data.synthetic import synthetic_fires, synthetic_winds
-from .model.analysis import city_forecasts, plan_interventions
+from .model.analysis import auto_budget, city_forecasts, plan_interventions
 from .model.tracer import TraceResult, simulate
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
 
-def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_DIR) -> dict:
+def run(mode: str = "synthetic", budget_fires: int | None = None, out_dir: str = OUTPUT_DIR,
+        date: str | None = None) -> dict:
+    """budget_fires=None sizes the plan to the day (see auto_budget)."""
     started = time.time()
     t0 = float(int(datetime.now(timezone.utc).timestamp() // 3600 * 3600))
+    replay_date = None
 
-    if mode == "live":
+    if mode == "replay":
+        replay_date = date or smokiest_backtest_day(out_dir)
+        df, wind, t0 = replay_inputs(replay_date)
+        label = f"Replay of {_long_date(replay_date)}: NASA FIRMS archive fires + ERA5 winds"
+    elif mode == "live":
         df = live_fires()
         wind = winds_mod.fetch_open_meteo(past_days=2, forecast_days=3)
         newest = datetime.fromtimestamp(df["t_epoch"].max(), IST).strftime("%d %b, %H:%M IST") if len(df) else "none"
@@ -40,10 +49,12 @@ def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_
 
     clusters = fires_mod.cluster_fires(df)
     trace = simulate(clusters, wind, t0)
+    budget = budget_fires or auto_budget(trace)
     result = {
         "meta": {
             "mode": mode,
             "data_label": label,
+            "replay_date": replay_date,
             "newest_fire_epoch": int(df["t_epoch"].max()) if len(df) else None,
             "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "forecast_start_epoch": int(t0),
@@ -55,7 +66,7 @@ def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_
         },
         "clusters": [c.to_dict() for c in clusters],
         "cities": city_forecasts(trace),
-        "plan": plan_interventions(trace, budget_fires=budget_fires),
+        "plan": plan_interventions(trace, budget_fires=budget),
         "plumes": trace.snapshots,
         "wind": wind.to_json(every=3),
     }
@@ -66,6 +77,39 @@ def run(mode: str = "synthetic", budget_fires: int = 150, out_dir: str = OUTPUT_
         json.dump(result, f)
     save_trace(trace, out_dir)
     return result
+
+
+def _long_date(iso: str) -> str:
+    d = datetime.fromisoformat(iso)
+    return f"{d.day} {d:%b %Y}"
+
+
+def smokiest_backtest_day(out_dir: str = OUTPUT_DIR) -> str:
+    """The day of the last backtest with the most forecast smoke across cities: the most telling replay."""
+    path = os.path.join(out_dir, "backtest.json")
+    if not os.path.exists(path):
+        raise SystemExit("Replay needs a date (--date YYYY-MM-DD) or a finished backtest to pick one from.")
+    with open(path) as f:
+        cities = json.load(f)["cities"]
+    totals: dict[str, float] = {}
+    for c in cities:
+        for d in c["days"]:
+            totals[d["date"]] = totals.get(d["date"], 0.0) + d["predicted_index"]
+    return max(totals, key=totals.get)
+
+
+def replay_inputs(day: str):
+    """Fires and winds exactly as a forecast issued at 18:00 IST the evening before `day` would have seen."""
+    from . import backtest
+    key = env("FIRMS_MAP_KEY")
+    if not key:
+        raise SystemExit("Replay needs FIRMS_MAP_KEY for archived fires.")
+    fires = backtest.fetch_season_fires(day, day, key)
+    wind = backtest.fetch_season_winds(day, day)
+    d = datetime.fromisoformat(day)
+    t0 = datetime(d.year, d.month, d.day, tzinfo=IST).timestamp() - (24 - backtest.ISSUE_HOUR_IST) * 3600
+    window = fires[(fires.t_epoch > t0 - backtest.LOOKBACK_H * 3600) & (fires.t_epoch <= t0)].reset_index(drop=True)
+    return window, wind, t0
 
 
 def live_fires():
@@ -96,10 +140,11 @@ def load_trace(out_dir: str = OUTPUT_DIR) -> TraceResult:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["synthetic", "live"], default="synthetic")
-    ap.add_argument("--budget", type=int, default=150, help="fire detections the state can act on")
+    ap.add_argument("--mode", choices=["synthetic", "live", "replay"], default="synthetic")
+    ap.add_argument("--budget", type=int, default=None, help="fire locations teams can cover (default: sized to the day)")
+    ap.add_argument("--date", help="replay date, YYYY-MM-DD")
     a = ap.parse_args()
-    r = run(a.mode, a.budget)
+    r = run(a.mode, a.budget, date=a.date)
     m = r["meta"]
     print(m["data_label"])
     print(f"[{m['mode']}] {m['fire_detections']} detections -> {m['clusters']} clusters, {m['runtime_s']}s")

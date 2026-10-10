@@ -10,7 +10,8 @@ function bulletin(data: Forecast): ReactNode[] {
     .map(c => <>{c.name}: smoke peaks <b className={c.peak_risk === 'severe' ? 'sev' : ''}>{c.peak_risk}</b> around {c.peak_time_ist}</>);
   const p = data.plan;
   items.push(<>Stopping {p.fires_targeted} fires in the right places cuts tomorrow's preventable exposure by <b>{p.exposure_avoided_pct_of_preventable}%</b></>);
-  if (data.meta.mode !== 'live') items.unshift(<><b>Demo data</b> on screen</>);
+  if (data.meta.mode === 'synthetic') items.unshift(<><b>Demo data</b> on screen</>);
+  if (data.meta.mode === 'replay') items.unshift(<><b>Replay</b> of a real day: {data.meta.data_label.split(':')[0].replace('Replay of ', '')}</>);
   return items;
 }
 

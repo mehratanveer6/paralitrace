@@ -23,7 +23,7 @@ app = FastAPI(title="ParaliTrace")
 
 class RunRequest(BaseModel):
     mode: str = Field("synthetic", pattern="^(synthetic|live)$")
-    budget: int = Field(150, ge=1, le=5000)
+    budget: int | None = Field(None, ge=1, le=5000)
 
 
 class AskRequest(BaseModel):

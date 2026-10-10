@@ -47,6 +47,8 @@ aside { display: flex; flex-direction: column; min-height: 0; border-right: 3px 
 .demo, .live { display: inline-block; padding: 3px 9px; background: var(--moderate);
         border: 2px solid var(--ink); font-weight: 700; font-size: 13px; transform: rotate(-1.5deg); }
 .live { background: var(--field); }
+.replay { display: inline-block; padding: 3px 9px; background: var(--fire); border: 2px solid var(--ink);
+          font-weight: 700; font-size: 13px; transform: rotate(-1.5deg); }
 button.link { background: none; border: 0; padding: 0; cursor: pointer; font-weight: 700; font-size: 13px;
               text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 button.link:disabled { cursor: wait; text-decoration: none; }

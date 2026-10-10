@@ -4,7 +4,8 @@ export type Risk = 'low' | 'moderate' | 'high' | 'severe';
 export type Tab = 'cities' | 'plan' | 'ask' | 'proof';
 
 export interface Meta {
-  mode: 'synthetic' | 'live';
+  mode: 'synthetic' | 'live' | 'replay';
+  replay_date?: string | null;   // YYYY-MM-DD when mode is 'replay'
   data_label: string;
   generated_utc: string;
   forecast_start_epoch: number;

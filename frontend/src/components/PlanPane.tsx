@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { api, plural } from '../lib';
 import type { Plan } from '../types';
 
-export function PlanPane({ plan, onPlan }: { plan: Plan | null; onPlan: (p: Plan) => void }) {
-  const [budget, setBudget] = useState(150);
+interface Props { plan: Plan | null; onPlan: (p: Plan) => void; defaultBudget: number }
+
+export function PlanPane({ plan, onPlan, defaultBudget }: Props) {
+  const [budget, setBudget] = useState(defaultBudget);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +19,8 @@ export function PlanPane({ plan, onPlan }: { plan: Plan | null; onPlan: (p: Plan
   return (
     <>
       <h3>Which fires to stop tomorrow</h3>
-      <p className="note">Teams and crop-residue machines can only reach so many fields. This picks the fires whose smoke would reach the most people.</p>
+      <p className="note">Teams and crop-residue machines can only reach so many fields. This picks the fires whose smoke would reach the most people.
+        The starting number is a quarter of the fires whose smoke reaches a city.</p>
       <label htmlFor="budget">Fire locations your teams can cover</label>
       <div className="inline">
         <input id="budget" type="number" min={1} max={5000} value={budget}

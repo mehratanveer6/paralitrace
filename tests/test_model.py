@@ -70,3 +70,13 @@ def test_timeline_has_every_frame_even_without_fires():
     for fires in ([], [FireCluster("a", 30.0, 75.5, 40, 4, T0)]):
         tr = simulate(fires, uniform_wind(2.0, -1.0, hours=96), T0, p)
         assert [s["t"] for s in tr.snapshots] == [int(T0 + 3 * 3600 * k) for k in range(16)]
+
+
+def test_auto_budget_is_a_quarter_of_the_fires_that_matter():
+    from paralitrace.model.analysis import auto_budget
+    fires = [FireCluster(f"c{i}", 28.61, 77.209 - 0.4 - 0.05 * i, 20.0, 4, T0 - 3600) for i in range(10)]
+    fires.append(FireCluster("far", 32.4, 74.0, 500.0, 40, T0 - 3600))   # upwind of nothing
+    tr = simulate(fires, uniform_wind(3.0, 0.0, hours=96), T0, ModelParams(horizon_hours=48))
+    assert auto_budget(tr) == 10          # 25% of the 40 fires that reach Delhi; the 40 far ones don't count
+    p = plan_interventions(tr, budget_fires=auto_budget(tr))
+    assert 0 < p["exposure_avoided_pct_of_preventable"] < 100

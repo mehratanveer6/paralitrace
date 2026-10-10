@@ -82,7 +82,9 @@ export default function App() {
             ? <CityDetail city={city} hour={hourAt(data, frame)} onBack={() => setCityId(null)} />
             : <CitiesPane data={data} onSelect={selectCity} />}
         </section>
-        <section className="pane" hidden={tab !== 'plan'}><PlanPane plan={plan} onPlan={setPlan} /></section>
+        <section className="pane" hidden={tab !== 'plan'}>
+          <PlanPane key={data.meta.generated_utc} plan={plan} onPlan={setPlan} defaultBudget={data.plan.budget_fires} />
+        </section>
         <section className="pane" hidden={tab !== 'ask'}><AskPane /></section>
         <section className="pane" hidden={tab !== 'proof'}><ProofPane /></section>
       </aside>

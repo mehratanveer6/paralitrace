@@ -9,8 +9,12 @@ export function Clock({ data, frame, onRefreshed }: Props) {
   const [error, setError] = useState<string | null>(null);
   const snap = data.plumes[frame];
   const h = hourAt(data, frame);
-  const live = data.meta.mode === 'live';
-  const updated = fmt(Date.parse(data.meta.generated_utc) / 1000, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  const mode = data.meta.mode;
+  const live = mode === 'live';
+  const issued = fmt(data.meta.forecast_start_epoch, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const replayDay = data.meta.replay_date
+    ? new Date(data.meta.replay_date + 'T00:00:00+05:30').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
+    : '';
 
   const fetchLive = async () => {
     setBusy(true); setError(null);
@@ -22,16 +26,19 @@ export function Clock({ data, frame, onRefreshed }: Props) {
   return (
     <div className="clock">
       <div className="when">{fmt(snap.t, { weekday: 'short', hour: '2-digit', minute: '2-digit' })} IST</div>
-      <div className="rel">{h === 0 ? 'Now' : `${h} hours from now`}</div>
+      {mode === 'replay' && <div className="rel">{fmt(snap.t, { day: 'numeric', month: 'short', year: 'numeric' })}</div>}
+      <div className="rel">{mode === 'replay'
+        ? (h === 0 ? 'When the forecast was issued' : `${h} hours after the forecast was issued`)
+        : (h === 0 ? 'Now' : `${h} hours from now`)}</div>
       <div className="src">
-        {live
-          ? <span className="live">Live satellite fires</span>
-          : <span className="demo">Demo data, not real fires</span>}
+        {mode === 'live' && <span className="live">Live satellite fires</span>}
+        {mode === 'replay' && <span className="replay">Replay: real fires, {replayDay}</span>}
+        {mode === 'synthetic' && <span className="demo">Demo data, not real fires</span>}
         <button className="link" onClick={fetchLive} disabled={busy}>
           {busy ? 'Fetching fires and winds' : live ? 'Refresh' : 'Fetch live fires'}
         </button>
       </div>
-      <div className="note">Forecast made {updated} IST</div>
+      <div className="note">Forecast issued {issued} IST</div>
       {error && <div className="err">{error}</div>}
     </div>
   );

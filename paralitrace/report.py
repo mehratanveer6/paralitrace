@@ -25,13 +25,14 @@ def _load(name: str) -> dict | None:
 def build(latest: dict | None, bt: dict | None) -> str:
     plan = (latest or {}).get("plan") or {}
     meta = (latest or {}).get("meta") or {}
-    live = meta.get("mode") == "live"
+    real = meta.get("mode") in ("live", "replay")
 
     if plan:
-        plan_line = (f"On the forecast run for this submission it avoids {plan['exposure_avoided_pct_of_preventable']}% "
+        when = "On the replayed day" if meta.get("mode") == "replay" else "On the forecast run for this submission"
+        plan_line = (f"{when} it avoids {plan['exposure_avoided_pct_of_preventable']}% "
                      f"of tomorrow's preventable exposure with {plan['fires_targeted']} fire locations, against "
                      f"{plan['naive_biggest_fires_pct_of_preventable']}% for sending the same teams to the biggest fires.")
-        if not live:
+        if not real:
             plan_line += " (These numbers come from demo data; rerun with live data before submitting.)"
     else:
         plan_line = "(Run the pipeline to fill in the planner's numbers.)"
@@ -104,7 +105,7 @@ for 16 cities across Punjab, Haryana and Delhi.
 
 NASA FIRMS VIIRS active fires (near-real-time and standard-processing archive), Open-Meteo wind
 forecasts and ERA5 reanalysis, OpenAQ ground-monitor PM2.5, OpenStreetMap.
-{"Forecast shown in the demo: " + data_line + "." if data_line else ""}
+{"Data shown in the demo: " + data_line + "." if data_line else ""}
 
 ## Limits
 
@@ -122,7 +123,8 @@ Python, NumPy, pandas, FastAPI, Strands Agents SDK, React, TypeScript, Vite, Lea
     pct = lambda k: plan.get(k, "[run the pipeline]")
     video = f"""# Video lines with your numbers
 
-- Plan segment: "With {plan.get('fires_targeted', 150)} field-team locations, the plan avoids {pct('exposure_avoided_pct_of_preventable')}% of tomorrow's preventable exposure. Sending the same teams to the biggest fires manages {pct('naive_biggest_fires_pct_of_preventable')}%."
+- Opening: "{'This is ' + meta.get('data_label','').split(':')[0].replace('Replay of ','') + ', replayed with real NASA fire detections.' if meta.get('mode') == 'replay' else 'This is today, with live NASA fire detections.'}"
+- Plan segment: "With {plan.get('budget_fires', '[N]')} field-team locations, the plan avoids {pct('exposure_avoided_pct_of_preventable')}% of tomorrow's preventable exposure. Sending the same teams to the biggest fires manages {pct('naive_biggest_fires_pct_of_preventable')}%."
 - Proof segment: {video_proof}
 """
     return writeup + "\n---\n\n" + video
