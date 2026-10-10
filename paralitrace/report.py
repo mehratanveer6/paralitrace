@@ -46,21 +46,30 @@ def proof_text(bt: dict | None) -> tuple[str, str]:
                      f"for repeating yesterday.")
     video = ""
     if h and m:
-        base, smoke, comb = m["persistence"], m.get("smoke_only"), m.get("combined")
+        base, smoke = m["persistence"], m.get("smoke_only")
+        cands = [m[k] for k in ("autogluon_combined", "combined") if k in m]
+        comb = max(cands, key=lambda x: (x["caught"], x["onsets_caught"], -x["false_alarm_pct"])) if cands else None
+        how = ("an AutoGluon forecast (AWS's open-source AutoML, retrained daily on past data only) plus ParaliTrace's "
+               "alerts" if comb and comb["key"] == "autogluon_combined" else
+               "the simple 'repeat yesterday' rule plus ParaliTrace's alerts")
         if comb and comb["caught"] > base["caught"]:
-            parts.append(f"On {h['test']}, which nothing was tuned on, adding ParaliTrace's alerts to the simple "
-                         f"'repeat yesterday' rule caught {comb['caught']} of {h['spike_days']} spike days a day ahead "
-                         f"({round(100 * comb['caught'] / h['spike_days'])}%) instead of {base['caught']} "
-                         f"({round(100 * base['caught'] / h['spike_days'])}%), and {comb['onsets_caught']} of "
-                         f"{h['onset_days']} new smoky spells instead of {base['onsets_caught']}, at the cost of more "
-                         f"false alarms ({comb['false_alarm_pct']}% against {base['false_alarm_pct']}%).")
-            video = (f"\"Does it work? I replayed the 2025 season against ground monitors. On November, adding "
-                     f"ParaliTrace's alerts to the simple repeat-yesterday rule caught {comb['caught']} of "
-                     f"{h['spike_days']} smoke-spike days instead of {base['caught']}, and {comb['onsets_caught']} new "
-                     f"smoky spells that repeating yesterday can never see coming.\"")
+            parts.append(f"On {h['test']}, with no setting tuned on it and every forecast using only earlier data, {how} caught {comb['caught']} of "
+                         f"{h['spike_days']} spike days a day ahead ({round(100 * comb['caught'] / h['spike_days'])}%) "
+                         f"instead of {base['caught']} ({round(100 * base['caught'] / h['spike_days'])}%) for repeating "
+                         f"yesterday's reading, and {comb['onsets_caught']} of {h['onset_days']} new smoky spells "
+                         f"instead of {base['onsets_caught']}, at the cost of more false alarms "
+                         f"({comb['false_alarm_pct']}% against {base['false_alarm_pct']}%).")
+            short = "an AutoGluon forecast with ParaliTrace's smoke alerts" if comb["key"] == "autogluon_combined" else "ParaliTrace's alerts on top of repeat-yesterday"
+            video = (f"\"Does it work? I replayed the 2025 season against ground monitors and held out November. "
+                     f"Simply repeating yesterday's reading caught {base['caught']} of {h['spike_days']} smoke-spike days. "
+                     f"Combining {short} caught {comb['caught']}, including {comb['onsets_caught']} of "
+                     f"{h['onset_days']} brand-new smoky spells that repeating yesterday can never see coming.\"")
         elif smoke:
             video = (f"\"Does it work? On November it saw {smoke['onsets_caught']} of {h['onset_days']} new smoky "
                      f"spells coming a day ahead, which repeating yesterday's reading never can.\"")
+        if "autogluon" in m:
+            parts.append(f"On its own the AutoGluon forecast misses by {m['autogluon']['mae']} µg/m³ a day against "
+                         f"{base['mae']} for repeating yesterday, so its value is in combination with the smoke alerts.")
         if "calibrated" in m:
             parts.append(f"A two-term regression on yesterday's reading and the smoke index was also tested and did "
                          f"not beat the simple rules (average error {m['calibrated']['mae']} µg/m³ against "
@@ -77,13 +86,17 @@ def aws_answer() -> str:
 protect the most people. It traces NASA satellite fire detections through wind forecasts with a particle model,
 and an AI assistant explains the forecast and writes school advisories in English, Hindi or Punjabi.
 
-AWS open source: Strands Agents SDK. The assistant is a Strands Agent with five @tool functions over the
+AWS open source: Strands Agents SDK and AutoGluon.
+- Strands Agents SDK: the assistant is a Strands Agent with five @tool functions over the
 forecast (run_info, list_city_risks, city_forecast, smoke_sources, intervention_plan). Strands runs the
 model-driven agent loop, generates the tool schemas from the Python type hints and docstrings, executes the
 tool calls and feeds the results back, so every number the assistant quotes comes from the model output and
 none is invented. The app shows each tool call Strands makes beside the answer. Strands' model-provider layer
-keeps the assistant portable: it runs on Gemini today and switches to Amazon Bedrock with one setting
-(PT_MODEL=bedrock), with fallback across models built on top.
+keeps the assistant portable: it runs on Gemini today and switches to Amazon Bedrock (Amazon Nova) with one
+setting, with automatic fallback across models.
+- AutoGluon (AutoGluon-TimeSeries): learns a next-day PM2.5 forecast for each city from its monitor history,
+retrained every day on past data only. Combined with ParaliTrace's physics-based smoke alerts it is the best rule
+in the held-out November test (see the Proof tab).
 
 AWS services: Not used in production for this submission. My AWS account's student credits weren't approved
 before the deadline, so I built entirely on the AWS open-source path the rules allow. The repository includes

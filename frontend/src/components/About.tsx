@@ -29,6 +29,11 @@ export function About() {
           school advisories in English, Hindi or Punjabi. It reaches the forecast only through five tools, so it can only
           quote numbers the model produced.</p>
 
+        <h3>Check it</h3>
+        <p>The Proof tab replays the 2025 season against ground monitors. A forecast from AutoGluon, AWS's open-source
+          AutoML library, retrained each day on the past only, is combined with the smoke model's alerts and scored on
+          November, which nothing was tuned on.</p>
+
         <h3>Limits</h3>
         <ul>
           <li>The smoke model is two-dimensional, with no chemistry or rain. It is far simpler than research models such as HYSPLIT.</li>

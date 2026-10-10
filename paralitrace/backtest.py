@@ -367,6 +367,14 @@ def run(start: str, end: str) -> dict:
     print("Monitors (OpenAQ)"); obs = season_pm25(start, end, akey)
     print("Replaying forecasts"); pred = replay(fires, wind, _days(start, end))
     doc = add_combined(score(pred, obs, start, end))
+    try:
+        from .ml_forecast import add_autogluon
+        print("AutoGluon forecast (walk-forward)")
+        add_autogluon(doc, os.path.join(OUTPUT_DIR, "autogluon"))
+    except ImportError:
+        print("  AutoGluon not installed (pip install -r requirements-ml.txt); skipping that comparison")
+    except Exception as e:  # e.g. too few days to train on; the rest of the backtest still stands
+        print(f"  AutoGluon comparison skipped: {e}")
     with open(os.path.join(OUTPUT_DIR, "backtest.json"), "w") as f:
         json.dump(doc, f)
     return doc

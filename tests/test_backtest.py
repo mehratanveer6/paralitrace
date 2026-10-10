@@ -180,3 +180,18 @@ def test_combined_rule_is_scored_on_the_same_held_out_days():
     # day2 spike, yest 0, call 1 -> caught onset; day3 spike, yest 1 -> caught; day4 no spike, call -> false;
     # day7 no spike, yest spike(day6) -> false
     assert m["caught"] == 2 and m["onsets_caught"] == 1 and m["false_alarm_pct"] == 50
+
+
+def test_autogluon_rows_are_scored_on_the_held_out_filter():
+    from paralitrace.ml_forecast import score_rows
+    ts = pd.date_range("2025-11-01", periods=4, freq="D")
+    df = pd.DataFrame({"item_id": "x", "timestamp": ts, "pm25": [100.0, 300.0, 120.0, 310.0],
+                       "smoke": [0, 0, 0, 0], "smoke_spike": [False, False, False, True],
+                       "observed_spike": [False, True, False, True], "thr": 200.0})
+    preds = {"autogluon": pd.Series({("x", ts[1]): 250.0, ("x", ts[2]): 250.0, ("x", ts[3]): 100.0})}
+    rows = {r["key"]: r for r in score_rows(df, date(2025, 11, 1), preds)}
+    # scored days 2..4 (day 1 has no yesterday). spikes on days 2 and 4; day 2 and 4 are new spells
+    assert rows["autogluon"]["caught"] == 1 and rows["autogluon"]["onsets_caught"] == 1
+    assert rows["autogluon"]["false_alarm_pct"] == 50          # called days 2 and 3, day 3 wasn't a spike
+    assert rows["autogluon_combined"]["caught"] == 2           # the smoke alert adds day 4
+    assert rows["autogluon"]["mae"] == round((50 + 130 + 210) / 3, 1)

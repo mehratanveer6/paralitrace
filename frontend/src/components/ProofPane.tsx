@@ -43,31 +43,38 @@ function SeasonChart({ days }: { days: BacktestDay[] }) {
   );
 }
 
-const ORDER = ['persistence', 'smoke_only', 'combined', 'calibrated_no_smoke', 'calibrated'];
+const ORDER = ['persistence', 'smoke_only', 'combined', 'autogluon_no_smoke', 'autogluon', 'autogluon_combined',
+  'calibrated_no_smoke', 'calibrated'];
 const NAME: Record<string, string> = {
   persistence: "Repeat yesterday's reading",
   smoke_only: 'ParaliTrace smoke model',
   combined: "Yesterday's rule + ParaliTrace alerts",
   calibrated_no_smoke: 'Regression on yesterday (tried)',
   calibrated: 'Regression on yesterday + smoke (tried)',
+  autogluon_no_smoke: 'AutoGluon on PM2.5 history',
+  autogluon: 'AutoGluon with smoke model input',
+  autogluon_combined: 'AutoGluon forecast + ParaliTrace alerts',
 };
 
 const PHRASE: Record<string, string> = {
   smoke_only: 'the ParaliTrace smoke model',
   combined: "yesterday's rule plus ParaliTrace's alerts",
+  autogluon_combined: "an AutoGluon forecast plus ParaliTrace's alerts",
 };
 
 function HeldoutBlock({ h }: { h: Heldout }) {
   const methods = [...h.methods].sort((a, b) => ORDER.indexOf(a.key) - ORDER.indexOf(b.key));
   const base = methods.find(x => x.key === 'persistence')!;
-  const best = methods.filter(x => x.key !== 'persistence').sort((a, b) => b.caught - a.caught)[0];
+  // best: most spike days caught, then most new spells, then fewest false alarms
+  const best = methods.filter(x => x.key !== 'persistence')
+    .sort((a, b) => b.caught - a.caught || b.onsets_caught - a.onsets_caught || a.false_alarm_pct - b.false_alarm_pct)[0];
   const smoke = methods.find(x => x.key === 'smoke_only');
   const beats = best && best.caught > base.caught;
   return (
     <>
       <h3>Tested on days it never saw</h3>
-      <p className="note">Scored only on {h.test}, which nothing was tuned on: {h.spike_days} spike days,
-        {' '}{h.onset_days} of them the first smoky day of a new spell.</p>
+      <p className="note">Scored only on {h.test}: no setting was tuned on it, and every forecast used only data from
+        before the day it forecast. {h.spike_days} spike days, {h.onset_days} of them the first smoky day of a new spell.</p>
       {beats ? (
         <div className="vs">
           <div className="win"><span className="big">{best.caught}/{h.spike_days}</span>spike days caught a day ahead with {PHRASE[best.key] ?? NAME[best.key]}, {best.onsets_caught} of {h.onset_days} new spells</div>
@@ -91,9 +98,10 @@ function HeldoutBlock({ h }: { h: Heldout }) {
         </tbody>
       </table>
       <p className="note">Repeating yesterday can't catch a new spell by definition; only the smoke model can see one coming.
-        The combined rule raises an alert when either does. Error is the average miss in daily PM2.5 where a method
-        predicts a number. A two-term regression was also tried: on {h.test} it smooths spikes away and doesn't beat
-        the simple rules, so the alert rule is what ParaliTrace uses.</p>
+        Combined rules raise an alert when either part does. AutoGluon (AWS's open-source AutoML) learns a PM2.5
+        forecast from each city's history, retrained every day on everything before it. Error is the average miss in
+        daily PM2.5 where a method predicts a number. A two-term regression was also tried and didn't beat the simple
+        rules. Every method is scored on the same days.</p>
     </>
   );
 }
